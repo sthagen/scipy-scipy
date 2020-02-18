@@ -4,6 +4,7 @@
 from __future__ import division, print_function, absolute_import
 
 import operator
+import math
 import sys
 import timeit
 from scipy.spatial import cKDTree
@@ -12,18 +13,12 @@ from ._upfirdn import upfirdn, _output_len, _upfirdn_modes
 from scipy import linalg, fft as sp_fft
 from scipy.fft._helper import _init_nd_shape_and_axes
 import numpy as np
-import math
-from scipy.special import factorial, lambertw
+from scipy.special import lambertw
 from .windows import get_window
 from ._arraytools import axis_slice, axis_reverse, odd_ext, even_ext, const_ext
 from .filter_design import cheby1, _validate_sos
 from .fir_filter_design import firwin
 from ._sosfilt import _sosfilt
-
-if sys.version_info >= (3, 5):
-    from math import gcd
-else:
-    from fractions import gcd
 
 
 __all__ = ['correlate', 'correlate2d',
@@ -903,7 +898,6 @@ def _conv_ops(x_shape, h_shape, mode):
     FFT (and the implementation of ``_freq_domain_conv``).
 
     """
-    x_size, h_size = _prod(x_shape), _prod(h_shape)
     if mode == "full":
         out_shape = [n + k - 1 for n, k in zip(x_shape, h_shape)]
     elif mode == "valid":
@@ -3098,7 +3092,7 @@ def resample_poly(x, up, down, axis=0, window=('kaiser', 5.0),
     # Determine our up and down factors
     # Use a rational approximation to save computation time on really long
     # signals
-    g_ = gcd(up, down)
+    g_ = math.gcd(up, down)
     up //= g_
     down //= g_
     if up == down == 1:
