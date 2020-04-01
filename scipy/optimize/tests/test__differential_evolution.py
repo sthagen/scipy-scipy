@@ -998,7 +998,14 @@ class TestDifferentialEvolutionSolver(object):
 
         assert_allclose(f(x_opt), f_opt, atol=0.001)
         assert_allclose(res.fun, f_opt, atol=0.001)
-        assert_allclose(res.x, x_opt, atol=0.002)
+
+        # selectively use higher tol here for 32-bit
+        # Windows based on gh-11693
+        if (platform.system() == 'Windows' and np.dtype(np.intp).itemsize < 8):
+            assert_allclose(res.x, x_opt, rtol=2.4e-6, atol=0.0035)
+        else:
+            assert_allclose(res.x, x_opt, atol=0.002)
+
         assert res.success
         assert_(np.all(A @ res.x <= b))
         assert_(np.all(np.array(c1(res.x)) >= 0))
@@ -1143,7 +1150,10 @@ class TestDifferentialEvolutionSolver(object):
 
         with suppress_warnings() as sup:
             sup.filter(UserWarning)
-            res = differential_evolution(f, bounds, strategy='rand1bin',
+            # original Lampinen test was with rand1bin, but that takes a
+            # huge amount of CPU time. Changing strategy to best1bin speeds
+            # things up a lot
+            res = differential_evolution(f, bounds, strategy='best1bin',
                                          seed=1234, constraints=constraints,
                                          maxiter=5000)
 
