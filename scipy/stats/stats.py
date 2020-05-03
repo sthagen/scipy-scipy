@@ -171,7 +171,8 @@ from numpy import array, asarray, ma
 
 from scipy.spatial.distance import cdist
 from scipy.ndimage import measurements
-from scipy._lib._util import _lazywhere, check_random_state, MapWrapper
+from scipy._lib._util import (_lazywhere, check_random_state, MapWrapper,
+                              rng_integers)
 import scipy.special as special
 from scipy import linalg
 from . import distributions
@@ -413,12 +414,12 @@ def mode(a, axis=0, nan_policy='propagate'):
     ...               [4, 7, 5, 9]])
     >>> from scipy import stats
     >>> stats.mode(a)
-    (array([[3, 1, 0, 0]]), array([[1, 1, 1, 1]]))
+    ModeResult(mode=array([[3, 1, 0, 0]]), count=array([[1, 1, 1, 1]]))
 
     To get mode of whole array, specify ``axis=None``:
 
     >>> stats.mode(a, axis=None)
-    (array([3]), array([3]))
+    ModeResult(mode=array([3]), count=array([3]))
 
     """
     a, axis = _chk_asarray(a, axis)
@@ -1233,11 +1234,8 @@ def kurtosis(a, axis=0, fisher=True, bias=True, nan_policy='propagate'):
     m2 = moment(a, 2, axis)
     m4 = moment(a, 4, axis)
     zero = (m2 == 0)
-    olderr = np.seterr(all='ignore')
-    try:
+    with np.errstate(all='ignore'):
         vals = np.where(zero, 0, m4 / m2**2.0)
-    finally:
-        np.seterr(**olderr)
 
     if not bias:
         can_correct = (n > 3) & (m2 > 0)
@@ -3796,13 +3794,10 @@ def spearmanr(a, b=None, axis=0, nan_policy='propagate'):
     dof = n_obs - 2  # degrees of freedom
 
     # rs can have elements equal to 1, so avoid zero division warnings
-    olderr = np.seterr(divide='ignore')
-    try:
+    with np.errstate(divide='ignore'):
         # clip the small negative values possibly caused by rounding
         # errors before taking the square root
         t = rs * np.sqrt((dof/((rs+1.0)*(1.0-rs))).clip(0))
-    finally:
-        np.seterr(**olderr)
 
     prob = 2 * distributions.t.sf(np.abs(t), dof)
 
@@ -4351,7 +4346,7 @@ def _perm_test(x, y, stat, compute_distance, reps=1000, workers=-1,
     # generate seeds for each rep (change to new parallel random number
     # capabilities in numpy >= 1.17+)
     random_state = check_random_state(random_state)
-    random_states = [np.random.RandomState(random_state.randint(1 << 32,
+    random_states = [np.random.RandomState(rng_integers(random_state, 1 << 32,
                      size=4, dtype=np.uint32)) for _ in range(reps)]
 
     # parallelizes with specified workers over number of reps and set seeds

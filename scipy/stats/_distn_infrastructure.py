@@ -100,8 +100,10 @@ entropy(%(shapes)s, loc=0, scale=1)
     (Differential) entropy of the RV.
 """
 _doc_fit = """\
-fit(data, %(shapes)s, loc=0, scale=1)
+fit(data)
     Parameter estimates for generic data.
+    See `scipy.stats.rv_continuous.fit <https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.rv_continuous.fit.html#scipy.stats.rv_continuous.fit>`__ for detailed documentation of the
+    keyword arguments.
 """
 _doc_expect = """\
 expect(func, args=(%(shapes_)s), loc=0, scale=1, lb=None, ub=None, conditional=False, **kwds)
@@ -775,9 +777,8 @@ class rv_generic(object):
     # The primed mu is a widely used notation for the noncentral moment.
     def _munp(self, n, *args):
         # Silence floating point warnings from integration.
-        olderr = np.seterr(all='ignore')
-        vals = self.generic_moment(n, *args)
-        np.seterr(**olderr)
+        with np.errstate(all='ignore'):
+            vals = self.generic_moment(n, *args)
         return vals
 
     def _argcheck_rvs(self, *args, **kwargs):
@@ -2188,18 +2189,20 @@ class rv_continuous(rv_generic):
         ----------
         data : array_like
             Data to use in calculating the MLEs.
-        args : floats, optional
+        arg1, arg2, arg3,... : floats, optional
             Starting value(s) for any shape-characterizing arguments (those not
             provided will be determined by a call to ``_fitstart(data)``).
             No default value.
         kwds : floats, optional
-            Starting values for the location and scale parameters; no default.
+            - `loc`: initial guess of the distribution's location parameter.
+            - `scale`: initial guess of the distribution's scale parameter.
+
             Special keyword arguments are recognized as holding certain
             parameters fixed:
 
             - f0...fn : hold respective shape parameters fixed.
               Alternatively, shape parameters to fix can be specified by name.
-              For example, if ``self.shapes == "a, b"``, ``fa``and ``fix_a``
+              For example, if ``self.shapes == "a, b"``, ``fa`` and ``fix_a``
               are equivalent to ``f0``, and ``fb`` and ``fix_b`` are
               equivalent to ``f1``.
 
@@ -2412,9 +2415,8 @@ class rv_continuous(rv_generic):
 
         # upper limit is often inf, so suppress warnings when integrating
         _a, _b = self._get_support(*args)
-        olderr = np.seterr(over='ignore')
-        h = integrate.quad(integ, _a, _b)[0]
-        np.seterr(**olderr)
+        with np.errstate(over='ignore'):
+            h = integrate.quad(integ, _a, _b)[0]
 
         if not np.isnan(h):
             return h
@@ -2530,9 +2532,8 @@ class rv_continuous(rv_generic):
             invfac = 1.0
         kwds['args'] = args
         # Silence floating point warnings from integration.
-        olderr = np.seterr(all='ignore')
-        vals = integrate.quad(fun, lb, ub, **kwds)[0] / invfac
-        np.seterr(**olderr)
+        with np.errstate(all='ignore'):
+            vals = integrate.quad(fun, lb, ub, **kwds)[0] / invfac
         return vals
 
 

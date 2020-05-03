@@ -1179,6 +1179,14 @@ def test_weightedtau():
     tau, p_value = stats.weightedtau(x, y)
     assert_approx_equal(tau, -0.56694968153682723)
 
+def test_segfault_issue_9710():
+    # https://github.com/scipy/scipy/issues/9710
+    # This test was created to check segfault
+    # In issue SEGFAULT only repros in optimized builds after calling the function twice
+    stats.weightedtau([1], [1.0])
+    stats.weightedtau([1], [1.0])
+    # The code below also caused SEGFAULT
+    stats.weightedtau([np.nan], [52])
 
 def test_kendall_tau_large():
     n = 172.
@@ -4064,21 +4072,15 @@ class TestGeoMean(object):
         #  Test a 1d list with zero element
         a = [10, 20, 30, 40, 50, 60, 70, 80, 90, 0]
         desired = 0.0  # due to exp(-inf)=0
-        olderr = np.seterr(all='ignore')
-        try:
+        with np.errstate(all='ignore'):
             check_equal_gmean(a, desired)
-        finally:
-            np.seterr(**olderr)
 
     def test_1d_array0(self):
         #  Test a 1d array with zero element
         a = np.array([10, 20, 30, 40, 50, 60, 70, 80, 90, 0])
         desired = 0.0  # due to exp(-inf)=0
-        olderr = np.seterr(all='ignore')
-        try:
+        with np.errstate(all='ignore'):
             check_equal_gmean(a, desired)
-        finally:
-            np.seterr(**olderr)
 
 
 class TestGeometricStandardDeviation(object):
