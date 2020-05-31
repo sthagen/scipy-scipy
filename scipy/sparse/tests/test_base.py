@@ -17,10 +17,11 @@ Run tests if sparse is not installed:
   python tests/test_base.py
 """
 
-import operator
 import contextlib
 import functools
+import operator
 import platform
+import sys
 from distutils.version import LooseVersion
 
 import numpy as np
@@ -47,6 +48,9 @@ from scipy.sparse.linalg import splu, expm, inv
 from scipy._lib.decorator import decorator
 
 import pytest
+
+
+IS_COLAB = ('google.colab' in sys.modules)
 
 
 def assert_in(member, collection, msg=None):
@@ -79,9 +83,6 @@ def sparse_may_share_memory(A, B):
                 return True
     return False
 
-
-# Only test matmul operator (A @ B) when available (Python 3.5+)
-TEST_MATMUL = hasattr(operator, 'matmul')
 
 sup_complex = suppress_warnings()
 sup_complex.filter(ComplexWarning)
@@ -1569,9 +1570,8 @@ class _TestCommon(object):
         assert_equal(B - A, "matrix on the right")
         assert_equal(B * A, "matrix on the right")
 
-        if TEST_MATMUL:
-            assert_equal(eval('A @ B'), "matrix on the left")
-            assert_equal(eval('B @ A'), "matrix on the right")
+        assert_equal(eval('A @ B'), "matrix on the left")
+        assert_equal(eval('B @ A'), "matrix on the right")
 
     def test_binop_custom_type_with_shape(self):
         A = self.spmatrix([[1], [2], [3]])
@@ -1583,14 +1583,10 @@ class _TestCommon(object):
         assert_equal(B - A, "matrix on the right")
         assert_equal(B * A, "matrix on the right")
 
-        if TEST_MATMUL:
-            assert_equal(eval('A @ B'), "matrix on the left")
-            assert_equal(eval('B @ A'), "matrix on the right")
+        assert_equal(eval('A @ B'), "matrix on the left")
+        assert_equal(eval('B @ A'), "matrix on the right")
 
     def test_matmul(self):
-        if not TEST_MATMUL:
-            pytest.skip("matmul is only tested in Python 3.5+")
-
         M = self.spmatrix(array([[3,0,0],[0,1,0],[2,0,3.0],[2,3,0]]))
         B = self.spmatrix(array([[0,1],[1,0],[0,2]],'d'))
         col = array([[1,2,3]]).T
@@ -4389,6 +4385,7 @@ class TestBSR(sparse_test_class(getset=False,
     def test_setdiag_comprehensive(self):
         pass
 
+    @pytest.mark.skipif(IS_COLAB, reason="exceeds memory limit")
     def test_scalar_idx_dtype(self):
         # Check that index dtype takes into account all parameters
         # passed to sparsetools, including the scalar ones

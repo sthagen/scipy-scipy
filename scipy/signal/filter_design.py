@@ -1195,8 +1195,12 @@ def sos2tf(sos):
     .. versionadded:: 0.16.0
     """
     sos = np.asarray(sos)
-    b = [1.]
-    a = [1.]
+    result_type = sos.dtype
+    if result_type.kind in 'bui':
+        result_type = np.float64
+
+    b = np.array([1], dtype=result_type)
+    a = np.array([1], dtype=result_type)
     n_sections = sos.shape[0]
     for section in range(n_sections):
         b = np.polymul(b, sos[section, :3])
@@ -4574,7 +4578,7 @@ def besselap(N, norm='phase'):
            of the ACM, Vol. 10, Issue 2, pp. 107-108, Feb. 1967,
            :DOI:`10.1145/363067.363115`
     .. [6] Miller and Bohn, "A Bessel Filter Crossover, and Its Relation to
-           Others", RaneNote 147, 1998, http://www.rane.com/note147.html
+           Others", RaneNote 147, 1998, https://www.ranecommercial.com/legacy/note147.html
 
     """
     if abs(int(N)) != N:
