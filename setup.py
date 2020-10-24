@@ -44,6 +44,7 @@ Programming Language :: Python :: 3
 Programming Language :: Python :: 3.6
 Programming Language :: Python :: 3.7
 Programming Language :: Python :: 3.8
+Programming Language :: Python :: 3.9
 Topic :: Software Development
 Topic :: Scientific/Engineering
 Operating System :: Microsoft :: Windows
@@ -512,12 +513,12 @@ def setup_package():
     try:
         import numpy
     except ImportError:  # We do not have numpy installed
-        build_requires = ['numpy>=1.14.5']
+        build_requires = ['numpy>=1.16.5']
     else:
         # If we're building a wheel, assume there already exist numpy wheels
         # for this platform, so it is safe to add numpy to build requirements.
         # See gh-5184.
-        build_requires = (['numpy>=1.14.5'] if 'bdist_wheel' in sys.argv[1:]
+        build_requires = (['numpy>=1.16.5'] if 'bdist_wheel' in sys.argv[1:]
                           else [])
 
     install_requires = build_requires
