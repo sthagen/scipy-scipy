@@ -132,7 +132,7 @@ std(%(shapes)s, loc=0, scale=1)
 """
 _doc_interval = """\
 interval(alpha, %(shapes)s, loc=0, scale=1)
-    Endpoints of the range that contains alpha percent of the distribution
+    Endpoints of the range that contains fraction alpha [0, 1] of the distribution
 """
 _doc_allmethods = ''.join([docheaders['methods'], _doc_rvs, _doc_pdf,
                            _doc_logpdf, _doc_cdf, _doc_logcdf, _doc_sf,
@@ -206,7 +206,9 @@ The probability density above is defined in the "standardized" form. To shift
 and/or scale the distribution use the ``loc`` and ``scale`` parameters.
 Specifically, ``%(name)s.pdf(x, %(shapes)s, loc, scale)`` is identically
 equivalent to ``%(name)s.pdf(y, %(shapes)s) / scale`` with
-``y = (x - loc) / scale``.
+``y = (x - loc) / scale``. Note that shifting the location of a distribution
+does not make it a "noncentral" distribution; noncentral generalizations of
+some distributions are available in separate classes.
 """
 
 _doc_default = ''.join([_doc_default_longsummary,
