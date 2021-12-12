@@ -84,9 +84,11 @@ PUBLIC_MODULES = ["scipy." + s for s in [
     "spatial.transform",
     "special",
     "stats",
+    "stats.contingency",
     "stats.distributions",
     "stats.mstats",
     "stats.qmc",
+    "stats.sampling"
 ]]
 
 # The PRIVATE_BUT_PRESENT_MODULES list contains modules that look public (lack
@@ -102,6 +104,8 @@ PRIVATE_BUT_PRESENT_MODULES = [
     'scipy.fftpack.helper',
     'scipy.fftpack.pseudo_diffs',
     'scipy.fftpack.realtransforms',
+    'scipy.integrate.odepack',
+    'scipy.integrate.quadpack',
     'scipy.integrate.dop',
     'scipy.integrate.lsoda',
     'scipy.integrate.vode',
@@ -188,6 +192,7 @@ PRIVATE_BUT_PRESENT_MODULES = [
     'scipy.sparse.linalg.isolve',
     'scipy.sparse.linalg.matfuncs',
     'scipy.sparse.sparsetools',
+    'scipy.sparse.spfuncs',
     'scipy.sparse.sputils',
     'scipy.spatial.ckdtree',
     'scipy.spatial.kdtree',
@@ -201,7 +206,6 @@ PRIVATE_BUT_PRESENT_MODULES = [
     'scipy.special.specfun',
     'scipy.special.spfun_stats',
     'scipy.stats.biasedurn',
-    'scipy.stats.contingency',
     'scipy.stats.kde',
     'scipy.stats.morestats',
     'scipy.stats.mstats_basic',

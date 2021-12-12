@@ -1,4 +1,3 @@
-from functools import partial
 import math
 import threading
 import pickle
@@ -7,15 +6,15 @@ from copy import deepcopy
 import numpy as np
 from numpy.testing import assert_allclose, assert_equal, suppress_warnings
 from numpy.lib import NumpyVersion
-from scipy.stats import (
+from scipy.stats.sampling import (
     TransformedDensityRejection,
     DiscreteAliasUrn,
     DiscreteGuideTable,
     NumericalInversePolynomial,
     NumericalInverseHermite,
-    NaiveRatioUniforms
+    SimpleRatioUniforms,
+    UNURANError
 )
-from scipy.stats import UNURANError
 from scipy import stats
 from scipy import special
 from scipy.stats import chisquare, cramervonmises
@@ -45,9 +44,7 @@ all_methods = [
     ("DiscreteGuideTable", {"dist": [0.02, 0.18, 0.8]}),
     ("NumericalInversePolynomial", {"dist": StandardNormal()}),
     ("NumericalInverseHermite", {"dist": StandardNormal()}),
-    ("NaiveRatioUniforms", {"dist": StandardNormal(),
-                            "u_min": -np.exp(-0.5) * np.sqrt(2),
-                            "u_max": np.exp(-0.5) * np.sqrt(2), "v_max": 1.0})
+    ("SimpleRatioUniforms", {"dist": StandardNormal(), "mode": 0})
 ]
 
 # Make sure an internal error occurs in UNU.RAN when invalid callbacks are
@@ -135,14 +132,14 @@ nan_domains = [
                          nan_domains)  # type: ignore[operator]
 @pytest.mark.parametrize("method, kwargs", all_methods)
 def test_bad_domain(domain, err, msg, method, kwargs):
-    Method = getattr(stats, method)
+    Method = getattr(stats.sampling, method)
     with pytest.raises(err, match=msg):
         Method(**kwargs, domain=domain)
 
 
 @pytest.mark.parametrize("method, kwargs", all_methods)
 def test_random_state(method, kwargs):
-    Method = getattr(stats, method)
+    Method = getattr(stats.sampling, method)
 
     # simple seed that works for any version of NumPy
     seed = 123
@@ -244,7 +241,7 @@ def test_threading_behaviour():
 
 @pytest.mark.parametrize("method, kwargs", all_methods)
 def test_pickle(method, kwargs):
-    Method = getattr(stats, method)
+    Method = getattr(stats.sampling, method)
     rng1 = Method(**kwargs, random_state=123)
     obj = pickle.dumps(rng1)
     rng2 = pickle.loads(obj)
@@ -927,7 +924,7 @@ class TestNumericalInverseHermite:
             sup.filter(RuntimeWarning, "overflow encountered")
             sup.filter(RuntimeWarning, "divide by zero")
             sup.filter(RuntimeWarning, "invalid value encountered")
-            fni = stats.NumericalInverseHermite(dist)
+            fni = NumericalInverseHermite(dist)
 
         x = np.random.rand(10)
         p_tol = np.max(np.abs(dist.ppf(x)-fni.ppf(x))/np.abs(dist.ppf(x)))
@@ -943,25 +940,25 @@ class TestNumericalInverseHermite:
 
         match = "`cdf` required but not found"
         with pytest.raises(ValueError, match=match):
-            stats.NumericalInverseHermite("norm")
+            NumericalInverseHermite("norm")
 
         match = "could not convert string to float"
         with pytest.raises(ValueError, match=match):
-            stats.NumericalInverseHermite(StandardNormal(),
-                                          u_resolution='ekki')
+            NumericalInverseHermite(StandardNormal(),
+                                    u_resolution='ekki')
 
         match = "`max_intervals' must be..."
         with pytest.raises(ValueError, match=match):
-            stats.NumericalInverseHermite(StandardNormal(), max_intervals=-1)
+            NumericalInverseHermite(StandardNormal(), max_intervals=-1)
 
         match = "`qmc_engine` must be an instance of..."
         with pytest.raises(ValueError, match=match):
-            fni = stats.NumericalInverseHermite(StandardNormal())
+            fni = NumericalInverseHermite(StandardNormal())
             fni.qrvs(qmc_engine=0)
 
         if NumpyVersion(np.__version__) >= '1.18.0':
             # issues with QMCEngines and old NumPy
-            fni = stats.NumericalInverseHermite(StandardNormal())
+            fni = NumericalInverseHermite(StandardNormal())
 
             match = "`d` must be consistent with dimension of `qmc_engine`."
             with pytest.raises(ValueError, match=match):
@@ -976,7 +973,7 @@ class TestNumericalInverseHermite:
     @pytest.mark.parametrize('size_in, size_out', sizes)
     def test_RVS(self, rng, size_in, size_out):
         dist = StandardNormal()
-        fni = stats.NumericalInverseHermite(dist)
+        fni = NumericalInverseHermite(dist)
 
         rng2 = deepcopy(rng)
         rvs = fni.rvs(size=size_in, random_state=rng)
@@ -1004,7 +1001,7 @@ class TestNumericalInverseHermite:
     @pytest.mark.parametrize('d_in, d_out', ds)
     def test_QRVS(self, qrng, size_in, size_out, d_in, d_out):
         dist = StandardNormal()
-        fni = stats.NumericalInverseHermite(dist)
+        fni = NumericalInverseHermite(dist)
 
         # If d and qrng.d are inconsistent, an error is raised
         if d_in is not None and qrng is not None and qrng.d != d_in:
@@ -1043,7 +1040,7 @@ class TestNumericalInverseHermite:
             pytest.skip("QMC doesn't play well with old NumPy")
 
         dist = StandardNormal()
-        fni = stats.NumericalInverseHermite(dist)
+        fni = NumericalInverseHermite(dist)
 
         size = (3, 4)
         d = 5
@@ -1069,17 +1066,17 @@ class TestNumericalInverseHermite:
 
         # fails with default tol
         with pytest.warns(RuntimeWarning, match=match):
-            stats.NumericalInverseHermite(stats.beta(*shapes))
+            NumericalInverseHermite(stats.beta(*shapes))
 
         # no error with coarser tol
-        stats.NumericalInverseHermite(stats.beta(*shapes), u_resolution=1e-8)
+        NumericalInverseHermite(stats.beta(*shapes), u_resolution=1e-8)
 
     def test_custom_distribution(self):
         dist1 = StandardNormal()
-        fni1 = stats.NumericalInverseHermite(dist1)
+        fni1 = NumericalInverseHermite(dist1)
 
         dist2 = stats.norm()
-        fni2 = stats.NumericalInverseHermite(dist2)
+        fni2 = NumericalInverseHermite(dist2)
 
         assert_allclose(fni1.rvs(random_state=0), fni2.rvs(random_state=0))
 
@@ -1242,104 +1239,52 @@ class TestDiscreteGuideTable:
             DiscreteGuideTable(stats.binom(10, 0.2), domain=domain)
 
 
-class Gamma:
-    def __init__(self, p):
-        self.p = p
+class TestSimpleRatioUniforms:
+    # pdf with piecewise linear function as transformed density
+    # with T = -1/sqrt with shift. Taken from UNU.RAN test suite
+    # (from file t_srou.c)
+    class dist:
+        def __init__(self, shift):
+            self.shift = shift
+            self.mode = shift
 
-    def pdf(self, x):
-        return x**(self.p - 1) * math.exp(-x)
+        def pdf(self, x):
+            x -= self.shift
+            y = 1. / (abs(x) + 1.)
+            return 0.5 * y * y
 
-    def cdf(self, x):
-        return stats.gamma.cdf(x, self.p)
+        def cdf(self, x):
+            x -= self.shift
+            if x <= 0.:
+                return 0.5 / (1. - x)
+            else:
+                return 1. - 0.5 / (1. + x)
 
-    @staticmethod
-    def support():
-        return 0, np.inf
+    dists = [dist(0.), dist(10000.)]
 
+    # exact mean and variance of the distributions in the list dists
+    mv1 = [0., np.inf]
+    mv2 = [10000., np.inf]
+    mvs = [mv1, mv2]
 
-class TestNaiveRatioUniforms:
+    @pytest.mark.parametrize("dist, mv_ex",
+                             zip(dists, mvs))
+    def test_basic(self, dist, mv_ex):
+        rng = SimpleRatioUniforms(dist, mode=dist.mode, random_state=42)
+        check_cont_samples(rng, dist, mv_ex)
+        rng = SimpleRatioUniforms(dist, mode=dist.mode,
+                                  cdf_at_mode=dist.cdf(dist.mode),
+                                  random_state=42)
+        check_cont_samples(rng, dist, mv_ex)
 
-    def test_rv_generation_default(self):
-        # use default settings (r=1, center=0)
-        # exponential distribution
-        class Exponential():
-            def pdf(self, x):
-                return np.exp(-x)
+    # test domains with inf + nan in them. need to write a custom test for
+    # this because not all methods support infinite tails.
+    @pytest.mark.parametrize("domain, err, msg", inf_nan_domains)
+    def test_inf_nan_domains(self, domain, err, msg):
+        with pytest.raises(err, match=msg):
+            SimpleRatioUniforms(StandardNormal(), domain=domain)
 
-            def cdf(self, x):
-                return 1 - np.exp(-x)
-
-        dist = Exponential()
-        rng = NaiveRatioUniforms(dist, v_max=1, u_min=0, u_max=2*np.exp(-1),
-                                 random_state=76525)
-
-        check_cont_samples(rng, dist, (1, 1))
-
-    @pytest.mark.parametrize("r", [0.36, 1.0, 1.43])
-    def test_rv_generation_r(self, r):
-        # test different values of r
-        # note: u_max, u_min are attained at the points -/+ sqrt((r+1)/r)
-        dist = StandardNormal()
-        y = np.sqrt((r+1)/r)
-        u = (dist.pdf(y))**(r/(r+1)) * y
-        v_max = (dist.pdf(0))**(1/(r+1))
-        rng = NaiveRatioUniforms(dist, r=r, u_min=-u, u_max=u, v_max=v_max,
-                                 random_state=7303)
-        check_cont_samples(rng, dist, (0, 1))
-
-    @pytest.mark.parametrize("p", [1.5, 2.83])
-    def test_rv_generation_mode_shift(self, p):
-        # test mode shift with Gamma(p) distribution, mode=p-1
-        # note: the pdf is bounded only if p >= 1
-        # note: u_max, u_min can be computed explicitly
-        def u_bound(x, p, m):
-            if x < 0:
-                return 0
-            return (x - m) * x**((p-1)/2) * math.exp(-x/2)
-        dist = Gamma(p)
-        m = p-1
-        h = (p+1+m)/2
-        k = np.sqrt(h**2 - m*(p-1))
-        u_min, u_max = u_bound(h-k, p, m), u_bound(h+k, p, m)
-        v_max = np.sqrt(dist.pdf(m))
-        rng = NaiveRatioUniforms(dist, center=m, u_min=u_min, u_max=u_max,
-                                 v_max=v_max, random_state=357)
-        check_cont_samples(rng, dist, (p, p))
-
-    def test_setup_no_bounds(self):
-        dist = StandardNormal()
-        u_bound = np.exp(-0.5) * np.sqrt(2)
-        v_max = 1.0
-
-        # no bound
-        rng = NaiveRatioUniforms(dist, random_state=7303)
-        check_cont_samples(rng, dist, (0, 1))
-        # just v_max
-        rng = NaiveRatioUniforms(dist, v_max=v_max, random_state=7303)
-        check_cont_samples(rng, dist, (0, 1))
-        # just one u-bound is missing
-        msg = 'Only one of the values of u_min and u_max is None.'
-        with pytest.warns(RuntimeWarning, match=msg):
-            rng = NaiveRatioUniforms(dist, u_max=u_bound, random_state=7303)
-            check_cont_samples(rng, dist, (0, 1))
-
-    def test_exceptions(self):
-        dist = StandardNormal()
-        # need u_min < u_max
-        msg = r"`u_min` must be smaller than `u_max`."
-        with pytest.raises(ValueError, match=msg):
-            NaiveRatioUniforms(dist, v_max=1, u_min=3, u_max=1)
-        with pytest.raises(ValueError, match=msg):
-            NaiveRatioUniforms(dist, v_max=1, u_min=1, u_max=1)
-        # need v_max > 0
-        msg = r'`v_max` must be positive.'
-        with pytest.raises(ValueError, match=msg):
-            NaiveRatioUniforms(dist, v_max=-1, u_min=1, u_max=3)
-        with pytest.raises(ValueError, match=msg):
-            NaiveRatioUniforms(dist, v_max=0, u_min=1, u_max=3)
-        # need r > 0
-        msg = r'`r` must be positive.'
-        with pytest.raises(ValueError, match=msg):
-            NaiveRatioUniforms(dist, r=0, v_max=1, u_min=1, u_max=3)
-        with pytest.raises(ValueError, match=msg):
-            NaiveRatioUniforms(dist, r=-0.24, v_max=1, u_min=1, u_max=3)
+    def test_bad_args(self):
+        # pdf_area < 0
+        with pytest.raises(ValueError, match=r"`pdf_area` must be > 0"):
+            SimpleRatioUniforms(StandardNormal(), mode=0, pdf_area=-1)

@@ -55,6 +55,24 @@ class TransformedDensityRejection(Method):
     def ppf_hat(self, u: npt.ArrayLike) -> np.ndarray: ...
 
 
+class SROUDist(Protocol):
+    @property
+    def pdf(self) -> Callable[..., float]: ...
+    @property
+    def support(self) -> Tuple[float, float]: ...
+
+
+class SimpleRatioUniforms(Method):
+    def __init__(self,
+                 dist: SROUDist,
+                 *,
+                 mode: None | float = ...,
+                 pdf_area: float = ...,
+                 domain: None | Tuple[float, float] = ...,
+                 cdf_at_mode: float = ...,
+                 random_state: SeedType = ...) -> None: ...
+
+
 UError = NamedTuple('UError', [('max_error', float),
                                ('mean_absolute_error', float)])
 
@@ -118,26 +136,6 @@ class NumericalInverseHermite(Method):
              d: None | int = ...,
              qmc_engine: None | stats.qmc.QMCEngine = ...) -> npt.ArrayLike: ...
     def u_error(self, sample_size: int = ...) -> UError: ...
-
-
-class NROUDist(Protocol):
-    @property
-    def pdf(self) -> Callable[..., float]: ...
-    @property
-    def support(self) -> Tuple[float, float]: ...
-
-
-class NaiveRatioUniforms(Method):
-    def __init__(self,
-                 dist: NROUDist,
-                 *,
-                 center: float = ...,
-                 domain: None | Tuple[float, float] = ...,
-                 r: float = ...,
-                 u_min: None | float = ...,
-                 u_max: None | float = ...,
-                 v_max: None | float = ...,
-                 random_state: SeedType = ...) -> None: ...
 
 
 class DAUDist(Protocol):

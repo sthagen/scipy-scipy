@@ -301,6 +301,7 @@ Statistical tests
    combine_pvalues
    jarque_bera
    page_trend_test
+   permutation_test
    tukey_hsd
 
 .. autosummary::
@@ -371,6 +372,14 @@ Statistical distances
    wasserstein_distance
    energy_distance
 
+Sampling
+--------
+
+.. toctree::
+   :maxdepth: 4
+
+   stats.sampling
+
 Random variate generation / CDF Inversion
 -----------------------------------------
 
@@ -378,12 +387,7 @@ Random variate generation / CDF Inversion
    :toctree: generated/
 
    rvs_ratio_uniforms
-   NaiveRatioUniforms
    NumericalInverseHermite
-   NumericalInversePolynomial
-   TransformedDensityRejection
-   DiscreteAliasUrn
-   DiscreteGuideTable
 
 Circular statistical functions
 ------------------------------
@@ -443,11 +447,11 @@ Warnings / Errors used in :mod:`scipy.stats`
    PearsonRNearConstantInputWarning
    SpearmanRConstantInputWarning
    BootstrapDegenerateDistributionWarning
-   UNURANError
 
 """
 
 from ._stats_py import *
+from ._variation import variation
 from .distributions import *
 from ._morestats import *
 from ._binomtest import binomtest
@@ -461,8 +465,7 @@ from .contingency import chi2_contingency
 from ._bootstrap import bootstrap, BootstrapDegenerateDistributionWarning
 from ._entropy import *
 from ._hypotests import *
-from ._rvs_sampling import rvs_ratio_uniforms  # noqa
-from ._unuran import *  # noqa
+from ._rvs_sampling import rvs_ratio_uniforms, NumericalInverseHermite  # noqa
 from ._page_trend_test import page_trend_test
 from ._mannwhitneyu import mannwhitneyu
 
