@@ -242,7 +242,7 @@ def test_levy_stable_random_state_property():
 def cases_test_moments():
     fail_normalization = set(['vonmises'])
     fail_higher = set(['vonmises', 'ncf'])
-    fail_loc_scale = set(['kappa3', 'kappa4'])  # see gh-13582
+    fail_loc_scale = set(['kappa4'])  # see gh-13582
 
     for distname, arg in distcont[:] + [(histogram_test_instance, tuple())]:
         if distname == 'levy_stable':
@@ -551,25 +551,12 @@ def check_pdf_logpdf_at_endpoints(distfn, args, msg):
     points = np.array([0, 1])
     vals = distfn.ppf(points, *args)
     vals = vals[np.isfinite(vals)]
-    with npt.suppress_warnings() as sup:
-        # Several distributions incur divide by zero or encounter invalid values when computing
-        # the pdf or logpdf at the endpoints.
-        suppress_messsages = [
-            "divide by zero encountered in true_divide",  # multiple distributions
-            "divide by zero encountered in log",  # multiple distributions
-            "divide by zero encountered in power",  # gengamma
-            "invalid value encountered in add",  # genextreme
-            "invalid value encountered in subtract",  # gengamma
-            ]
-        for msg in suppress_messsages:
-            sup.filter(category=RuntimeWarning, message=msg)
-
-        pdf = distfn.pdf(vals, *args)
-        logpdf = distfn.logpdf(vals, *args)
-        pdf = pdf[(pdf != 0) & np.isfinite(pdf)]
-        logpdf = logpdf[np.isfinite(logpdf)]
-        msg += " - logpdf-log(pdf) relationship"
-        npt.assert_almost_equal(np.log(pdf), logpdf, decimal=7, err_msg=msg)
+    pdf = distfn.pdf(vals, *args)
+    logpdf = distfn.logpdf(vals, *args)
+    pdf = pdf[(pdf != 0) & np.isfinite(pdf)]
+    logpdf = logpdf[np.isfinite(logpdf)]
+    msg += " - logpdf-log(pdf) relationship"
+    npt.assert_almost_equal(np.log(pdf), logpdf, decimal=7, err_msg=msg)
 
 
 def check_sf_logsf(distfn, args, msg):
@@ -832,3 +819,12 @@ def test_broadcasting_in_moments_gh12192_regression():
                           [np.nan, np.nan, 6.78730736]])
     npt.assert_allclose(vals3, expected3, rtol=1e-8)
     assert vals3.shape == expected3.shape
+
+def test_kappa3_array_gh13582():
+    # https://github.com/scipy/scipy/pull/15140#issuecomment-994958241
+    shapes = [0.5, 1.5, 2.5, 3.5, 4.5]
+    moments = 'mvsk'
+    res = np.array([[stats.kappa3.stats(shape, moments=moment) for shape in shapes]
+                    for moment in moments])
+    res2 = np.array(stats.kappa3.stats(shapes, moments=moments))
+    npt.assert_allclose(res, res2)
