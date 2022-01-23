@@ -12,6 +12,85 @@ from scipy._lib._docscrape import FunctionDoc, Parameter
 import inspect
 
 
+def _broadcast_arrays(arrays, axis=None):
+    """
+    Broadcast shapes of arrays, ignoring incompatibility of specified axes
+    """
+    new_shapes = _broadcast_array_shapes(arrays, axis=axis)
+    if axis is None:
+        new_shapes = [new_shapes]*len(arrays)
+    return [np.broadcast_to(array, new_shape)
+            for array, new_shape in zip(arrays, new_shapes)]
+
+
+def _broadcast_array_shapes(arrays, axis=None):
+    """
+    Broadcast shapes of arrays, ignoring incompatibility of specified axes
+    """
+    shapes = [np.asarray(arr).shape for arr in arrays]
+    return _broadcast_shapes(shapes, axis)
+
+
+def _broadcast_shapes(shapes, axis=None):
+    """
+    Broadcast shapes, ignoring incompatibility of specified axes
+    """
+    if not shapes:
+        return shapes
+
+    # input validation
+    if axis is not None:
+        axis = np.atleast_1d(axis)
+        axis_int = axis.astype(int)
+        if not np.array_equal(axis_int, axis):
+            raise ValueError('`axis` must be an integer, a '
+                             'tuple of integers, or `None`.')
+        axis = axis_int
+
+    # First, ensure all shapes have same number of dimensions by prepending 1s.
+    n_dims = max([len(shape) for shape in shapes])
+    new_shapes = np.ones((len(shapes), n_dims), dtype=int)
+    for row, shape in zip(new_shapes, shapes):
+        row[len(row)-len(shape):] = shape  # can't use negative indices (-0:)
+
+    # Remove the shape elements of the axes to be ignored, but remember them.
+    if axis is not None:
+        axis[axis < 0] = n_dims + axis[axis < 0]
+        axis = np.sort(axis)
+        if axis[-1] >= n_dims or axis[0] < 0:
+            message = (f"`axis` is out of bounds "
+                       f"for array of dimension {n_dims}")
+            raise ValueError(message)
+
+        if len(np.unique(axis)) != len(axis):
+            raise ValueError("`axis` must contain only distinct elements")
+
+        removed_shapes = new_shapes[:, axis]
+        new_shapes = np.delete(new_shapes, axis, axis=1)
+
+    # If arrays are broadcastable, shape elements that are 1 may be replaced
+    # with a corresponding non-1 shape element. Assuming arrays are
+    # broadcastable, that final shape element can be found with:
+    new_shape = np.max(new_shapes, axis=0)
+    # except in case of an empty array:
+    new_shape *= new_shapes.all(axis=0)
+
+    # Among all arrays, there can only be one unique non-1 shape element.
+    # Therefore, if any non-1 shape element does not match what we found
+    # above, the arrays must not be broadcastable after all.
+    if np.any(~((new_shapes == 1) | (new_shapes == new_shape))):
+        raise ValueError("Array shapes are incompatible for broadcasting.")
+
+    if axis is not None:
+        # Add back the shape elements that were ignored
+        new_axis = axis - np.arange(len(axis))
+        new_shapes = [tuple(np.insert(new_shape, new_axis, removed_shape))
+                      for removed_shape in removed_shapes]
+        return new_shapes
+    else:
+        return tuple(new_shape)
+
+
 def _broadcast_array_shapes_remove_axis(arrays, axis=None):
     """
     Broadcast shapes of arrays, dropping specified axes
@@ -41,34 +120,17 @@ def _broadcast_shapes_remove_axis(shapes, axis=None):
     Same as _broadcast_array_shapes, but given a sequence
     of array shapes `shapes` instead of the arrays themselves.
     """
-    n_dims = max([len(shape) for shape in shapes])
-    new_shapes = np.ones((len(shapes), n_dims), dtype=int)
-    for row, shape in zip(new_shapes, shapes):
-        row[len(row)-len(shape):] = shape  # can't use negative indices (-0:)
+    shapes = _broadcast_shapes(shapes, axis)
+    shape = shapes[0]
     if axis is not None:
-        new_shapes = np.delete(new_shapes, axis, axis=1)
-    new_shape = np.max(new_shapes, axis=0)
-    new_shape *= new_shapes.all(axis=0)
-    if np.any(~((new_shapes == 1) | (new_shapes == new_shape))):
-        raise ValueError("Array shapes are incompatible for broadcasting.")
-    return tuple(new_shape)
+        shape = np.delete(shape, axis)
+    return tuple(shape)
 
 
-def _broadcast_concatenate(xs, axis):
+def _broadcast_concatenate(arrays, axis):
     """Concatenate arrays along an axis with broadcasting."""
-    # prepend 1s to array shapes as needed
-    ndim = max([x.ndim for x in xs])
-    xs = [x.reshape([1]*(ndim-x.ndim) + list(x.shape)) for x in xs]
-    # move the axis we're concatenating along to the end
-    xs = [np.swapaxes(x, axis, -1) for x in xs]
-    # determine final shape of all but the last axis
-    shape = _broadcast_array_shapes_remove_axis(xs, axis=-1)
-    # broadcast along all but the last axis
-    xs = [np.broadcast_to(x, shape + (x.shape[-1],)) for x in xs]
-    # concatenate along last axis
-    res = np.concatenate(xs, axis=-1)
-    # move the last axis back to where it was
-    res = np.swapaxes(res, axis, -1)
+    arrays = _broadcast_arrays(arrays, axis)
+    res = np.concatenate(arrays, axis=axis)
     return res
 
 
@@ -197,10 +259,19 @@ _nan_policy_parameter = inspect.Parameter(_name,
                                           inspect.Parameter.KEYWORD_ONLY,
                                           default='propagate')
 
+_standard_note_addition = (
+    """\nBeginning in SciPy 1.9, ``np.matrix`` inputs (not recommended for new
+code) are converted to ``np.ndarray``s before the calculation is performed. In
+this case, the output will be a scalar or ``np.ndarray`` of appropriate shape
+rather than a 2D ``np.matrix``. Similarly, while masked elements of masked
+arrays are ignored, the output will be a scalar or ``np.ndarray`` rather than a
+masked array with ``mask=False``.""").split('\n')
+
 
 def _axis_nan_policy_factory(result_object, default_axis=0,
                              n_samples=1, paired=False,
-                             result_unpacker=None, too_small=0):
+                             result_unpacker=None, too_small=0,
+                             n_outputs=2, kwd_samples=[]):
     """Factory for a wrapper that adds axis/nan_policy params to a function.
 
     Parameters
@@ -234,6 +305,17 @@ def _axis_nan_policy_factory(result_object, default_axis=0,
         raise an error. This argument prevents the error from being raised when
         input is not 1D and instead places a NaN in the corresponding element
         of the result.
+    n_outputs : int, default: 2
+        The number of outputs produced by the function given 1d sample(s). For
+        example, hypothesis tests that return a namedtuple or result object
+        with attributes ``statistic`` and ``pvalue`` use the default
+        ``n_outputs=2``; summary statistics with scalar output use
+        ``n_outputs=1``.
+    kwd_samples : sequence, default: []
+        The names of keyword parameters that should be treated as samples. For
+        example, `gmean` accepts as its first argument a sample `a` but
+        also `weights` as a fourth, optional keyword argument. In this case, we
+        use `n_samples=1` and kwd_samples=['weights'].
     """
 
     if result_unpacker is None:
@@ -282,13 +364,30 @@ def _axis_nan_policy_factory(result_object, default_axis=0,
 
             # rename avoids UnboundLocalError
             if callable(n_samples):
+                # Future refactoring idea: no need for callable n_samples.
+                # Just replace `n_samples` and `kwd_samples` with a single
+                # list of the names of all samples, and treat all of them
+                # as `kwd_samples` are treated below.
                 n_samp = n_samples(kwds)
             else:
                 n_samp = n_samples or len(args)
 
+            # If necessary, rearrange function signature: accept other samples
+            # as positional args right after the first n_samp args
+            kwd_samp = [name for name in kwd_samples
+                        if kwds.get(name, None) is not None]
+            n_kwd_samp = len(kwd_samp)
+            if not kwd_samp:
+                hypotest_fun_out = hypotest_fun_in
+            else:
+                def hypotest_fun_out(*samples, **kwds):
+                    new_kwds = dict(zip(kwd_samp, samples[n_samp:]))
+                    kwds.update(new_kwds)
+                    return hypotest_fun_in(*samples[:n_samp], **kwds)
+
             # Extract the things we need here
             samples = [np.atleast_1d(kwds.pop(param))
-                       for param in params[:n_samp]]
+                       for param in (params[:n_samp] + kwd_samp)]
             vectorized = True if 'axis' in params else False
             axis = kwds.pop('axis', default_axis)
             nan_policy = kwds.pop('nan_policy', 'propagate')
@@ -297,12 +396,25 @@ def _axis_nan_policy_factory(result_object, default_axis=0,
             # convert masked arrays to regular arrays with sentinel values
             samples, sentinel = _masked_arrays_2_sentinel_arrays(samples)
 
+            # standardize to always work along last axis
             if axis is None:
                 samples = [sample.ravel() for sample in samples]
-                axis = 0
-            elif axis != int(axis):
-                raise ValueError('`axis` must be an integer')
-            axis = int(axis)
+            else:
+                samples = _broadcast_arrays(samples, axis=axis)
+                axis = np.atleast_1d(axis)
+                n_axes = len(axis)
+                # move all axes in `axis` to the end to be raveled
+                samples = [np.moveaxis(sample, axis, range(-len(axis), 0))
+                           for sample in samples]
+                shapes = [sample.shape for sample in samples]
+                # New shape is unchanged for all axes _not_ in `axis`
+                # At the end, we append the product of the shapes of the axes
+                # in `axis`. Appending -1 doesn't work for zero-size arrays!
+                new_shapes = [shape[:-n_axes] + (np.prod(shape[-n_axes:]),)
+                              for shape in shapes]
+                samples = [sample.reshape(new_shape)
+                           for sample, new_shape in zip(samples, new_shapes)]
+            axis = -1  # work over the last axis
 
             # if axis is not needed, just handle nan_policy and return
             ndims = np.array([sample.ndim for sample in samples])
@@ -319,7 +431,8 @@ def _axis_nan_policy_factory(result_object, default_axis=0,
                 # currently the hypothesis tests this is applied to do not
                 # propagate nans in a sensible way
                 if any(contains_nans) and nan_policy == 'propagate':
-                    return result_object(np.nan, np.nan)
+                    res = np.full(n_outputs, np.nan)
+                    return result_object(*res)
 
                 # Addresses nan_policy == "omit"
                 if any(contains_nans) and nan_policy == 'omit':
@@ -334,7 +447,7 @@ def _axis_nan_policy_factory(result_object, default_axis=0,
 
                 if sentinel:
                     samples = _remove_sentinel(samples, paired, sentinel)
-                return hypotest_fun_in(*samples, **kwds)
+                return hypotest_fun_out(*samples, **kwds)
 
             # check for empty input
             # ideally, move this to the top, but some existing functions raise
@@ -342,9 +455,8 @@ def _axis_nan_policy_factory(result_object, default_axis=0,
             # backward compatibility.
             empty_output = _check_empty_inputs(samples, axis)
             if empty_output is not None:
-                statistic = empty_output
-                pvalue = empty_output.copy()
-                return result_object(statistic, pvalue)
+                return result_object(*([empty_output.copy()
+                                        for i in range(n_outputs)]))
 
             # otherwise, concatenate all samples along axis, remembering where
             # each separate sample begins
@@ -357,39 +469,43 @@ def _axis_nan_policy_factory(result_object, default_axis=0,
                 scipy.stats._stats_py._contains_nan(x, nan_policy))
 
             if vectorized and not contains_nan and not sentinel:
-                return hypotest_fun_in(*samples, axis=axis, **kwds)
+                return hypotest_fun_out(*samples, axis=axis, **kwds)
 
             # Addresses nan_policy == "omit"
             if contains_nan and nan_policy == 'omit':
                 def hypotest_fun(x):
-                    samples = np.split(x, split_indices)[:n_samp]
+                    samples = np.split(x, split_indices)[:n_samp+n_kwd_samp]
                     samples = _remove_nans(samples, paired)
                     if sentinel:
                         samples = _remove_sentinel(samples, paired, sentinel)
                     if is_too_small(samples):
-                        return result_object(np.nan, np.nan)
-                    return hypotest_fun_in(*samples, **kwds)
+                        res = np.full(n_outputs, np.nan)
+                        return result_object(*res)
+                    return hypotest_fun_out(*samples, **kwds)
 
             # Addresses nan_policy == "propagate"
             elif contains_nan and nan_policy == 'propagate':
                 def hypotest_fun(x):
                     if np.isnan(x).any():
-                        return result_object(np.nan, np.nan)
-                    samples = np.split(x, split_indices)[:n_samp]
+                        res = np.full(n_outputs, np.nan)
+                        return result_object(*res)
+                    samples = np.split(x, split_indices)[:n_samp+n_kwd_samp]
                     if sentinel:
                         samples = _remove_sentinel(samples, paired, sentinel)
                     if is_too_small(samples):
-                        return result_object(np.nan, np.nan)
-                    return hypotest_fun_in(*samples, **kwds)
+                        res = np.full(n_outputs, np.nan)
+                        return result_object(*res)
+                    return hypotest_fun_out(*samples, **kwds)
 
             else:
                 def hypotest_fun(x):
-                    samples = np.split(x, split_indices)[:n_samp]
+                    samples = np.split(x, split_indices)[:n_samp+n_kwd_samp]
                     if sentinel:
                         samples = _remove_sentinel(samples, paired, sentinel)
                     if is_too_small(samples):
-                        return result_object(np.nan, np.nan)
-                    return hypotest_fun_in(*samples, **kwds)
+                        res = np.full(n_outputs, np.nan)
+                        return result_object(*res)
+                    return hypotest_fun_out(*samples, **kwds)
 
             x = np.moveaxis(x, axis, -1)
             res = np.apply_along_axis(hypotest_fun, axis=-1, arr=x)
@@ -407,6 +523,7 @@ def _axis_nan_policy_factory(result_object, default_axis=0,
                 _nan_policy_parameter_doc)
         else:
             doc['Parameters'].append(_nan_policy_parameter_doc)
+        doc['Notes'] += _standard_note_addition
         doc = str(doc).split("\n", 1)[1]  # remove signature
         axis_nan_policy_wrapper.__doc__ = str(doc)
 
