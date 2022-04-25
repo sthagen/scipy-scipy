@@ -5982,16 +5982,16 @@ def ttest_ind_from_stats(mean1, std1, nobs1, mean2, std2, nobs2,
 
                           Number of    Sample     Sample
                     Size    ones        Mean     Variance
-        Sample 1    150      30         0.2        0.16
-        Sample 2    200      45         0.225      0.174375
+        Sample 1    150      30         0.2        0.161073
+        Sample 2    200      45         0.225      0.175251
 
     The sample mean :math:`\hat{p}` is the proportion of ones in the sample
     and the variance for a binary observation is estimated by
     :math:`\hat{p}(1-\hat{p})`.
 
-    >>> ttest_ind_from_stats(mean1=0.2, std1=np.sqrt(0.16), nobs1=150,
-    ...                      mean2=0.225, std2=np.sqrt(0.17437), nobs2=200)
-    Ttest_indResult(statistic=-0.564327545549774, pvalue=0.5728947691244874)
+    >>> ttest_ind_from_stats(mean1=0.2, std1=np.sqrt(0.161073), nobs1=150,
+    ...                      mean2=0.225, std2=np.sqrt(0.175251), nobs2=200)
+    Ttest_indResult(statistic=-0.5627187905196761, pvalue=0.5739887114209541)
 
     For comparison, we could compute the t statistic and p-value using
     arrays of 0s and 1s and `scipy.stat.ttest_ind`, as above.
