@@ -161,7 +161,6 @@ Multivariate distributions
    multivariate_normal    -- Multivariate normal distribution
    matrix_normal          -- Matrix normal distribution
    multivariate_beta      -- Multivariate beta distribution (Dirichlet)
-   dirichlet              -- Dirichlet (deprecated; see `multivariate_beta`)
    wishart                -- Wishart
    invwishart             -- Inverse Wishart
    multinomial            -- Multinomial distribution
@@ -210,6 +209,7 @@ Summary statistics
    describe          -- Descriptive statistics
    gmean             -- Geometric mean
    hmean             -- Harmonic mean
+   pmean             -- Power mean
    kurtosis          -- Fisher or Pearson kurtosis
    mode              -- Modal value
    moment            -- Central moment
@@ -394,7 +394,6 @@ Random variate generation / CDF Inversion
    :toctree: generated/
 
    rvs_ratio_uniforms
-   NumericalInverseHermite
 
 Distribution Fitting
 --------------------
