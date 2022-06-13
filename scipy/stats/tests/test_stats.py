@@ -1332,6 +1332,14 @@ def test_kendalltau_nan_2nd_arg():
     assert_allclose(r1.correlation, r2.correlation, atol=1e-15)
 
 
+def test_kendalltau_dep_initial_lexsort():
+    with pytest.warns(
+        DeprecationWarning,
+        match="'kendalltau' keyword argument 'initial_lexsort'"
+    ):
+        stats.kendalltau([], [], initial_lexsort=True)
+
+
 class TestKendallTauAlternative:
     def test_kendalltau_alternative_asymptotic(self):
         # Test alternative parameter, asymptotic method (due to tie)
@@ -2871,6 +2879,12 @@ class TestIQR:
 
         # Bad scale
         assert_raises(ValueError, stats.iqr, x, scale='foobar')
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="The use of 'scale=\"raw\"'"
+        ):
+            stats.iqr([1], scale='raw')
 
 
 class TestMoments:

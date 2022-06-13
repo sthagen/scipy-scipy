@@ -3072,7 +3072,8 @@ def iqr(x, axis=None, rng=(25, 75), scale=1.0, nan_policy='propagate',
           * 'normal' : Scale by
             :math:`2 \sqrt{2} erf^{-1}(\frac{1}{2}) \approx 1.349`.
 
-        The default is 1.0. The use of ``scale='raw'`` is deprecated.
+        The default is 1.0. The use of ``scale='raw'`` is deprecated infavor
+        of ``scale=1`` and will raise an error in SciPy 1.12.0.
         Array-like `scale` is also allowed, as long
         as it broadcasts correctly to the output such that
         ``out / scale`` is a valid operation. The output dimensions
@@ -3156,10 +3157,9 @@ def iqr(x, axis=None, rng=(25, 75), scale=1.0, nan_policy='propagate',
         if scale_key not in _scale_conversions:
             raise ValueError("{0} not a valid scale for `iqr`".format(scale))
         if scale_key == 'raw':
-            warnings.warn(
-                "use of scale='raw' is deprecated, use scale=1.0 instead",
-                np.VisibleDeprecationWarning
-            )
+            msg = ("The use of 'scale=\"raw\"' is deprecated infavor of "
+                   "'scale=1' and will raise an error in SciPy 1.12.0.")
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
         scale = _scale_conversions[scale_key]
 
     # Select the percentile function to use based on nans and policy
@@ -5018,8 +5018,12 @@ def kendalltau(x, y, initial_lexsort=None, nan_policy='propagate',
     x, y : array_like
         Arrays of rankings, of the same shape. If arrays are not 1-D, they
         will be flattened to 1-D.
-    initial_lexsort : bool, optional
-        Unused (deprecated).
+    initial_lexsort : bool, optional, deprecated
+        This argument is unused.
+
+        .. deprecated:: 1.10.0
+           `kendalltau` keyword argument `initial_lexsort` is deprecated as it
+           is unused and will be removed in SciPy 1.12.0.
     nan_policy : {'propagate', 'raise', 'omit'}, optional
         Defines how to handle when input contains nan.
         The following options are available (default is 'propagate'):
@@ -5102,6 +5106,11 @@ def kendalltau(x, y, initial_lexsort=None, nan_policy='propagate',
     0.2827454599327748
 
     """
+    if initial_lexsort is not None:
+        msg = ("'kendalltau' keyword argument 'initial_lexsort' is deprecated"
+               " as it is unused and will be removed in SciPy 1.12.0.")
+        warnings.warn(msg, DeprecationWarning, stacklevel=2)
+
     x = np.asarray(x).ravel()
     y = np.asarray(y).ravel()
 
@@ -5132,9 +5141,6 @@ def kendalltau(x, y, initial_lexsort=None, nan_policy='propagate',
             message = ("nan_policy='omit' is currently compatible only with "
                        "variant='b'.")
             raise ValueError(message)
-
-    if initial_lexsort is not None:  # deprecate to drop!
-        warnings.warn('"initial_lexsort" is gone!')
 
     def count_rank_tie(ranks):
         cnt = np.bincount(ranks).astype('int64', copy=False)
