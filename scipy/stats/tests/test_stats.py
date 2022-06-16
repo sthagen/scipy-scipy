@@ -632,6 +632,12 @@ class TestFisherExact:
         # before, this would have risen a ValueError
         odds, pvalue = stats.fisher_exact([[1, 2], [9, 84419233]])
 
+    @pytest.mark.parametrize("alternative", ['two-sided', 'less', 'greater'])
+    def test_result(self, alternative):
+        table = np.array([[14500, 20000], [30000, 40000]])
+        res = stats.fisher_exact(table, alternative=alternative)
+        assert_equal((res.statistic, res.pvalue), res)
+
 
 class TestCorrSpearmanr:
     """ W.II.D. Compute a correlation matrix on all the variables.
@@ -6815,11 +6821,10 @@ class TestCombinePvalues:
         Z_p, p_p = stats.combine_pvalues([.01, .2, .3], method='pearson')
         assert_approx_equal(0.5 * (Z_f+Z_p), Z, significant=4)
 
+    methods = ["fisher", "pearson", "tippett", "stouffer", "mudholkar_george"]
+
     @pytest.mark.parametrize("variant", ["single", "all", "random"])
-    @pytest.mark.parametrize(
-        "method",
-        ["fisher", "pearson", "tippett", "stouffer", "mudholkar_george"],
-    )
+    @pytest.mark.parametrize("method", methods)
     def test_monotonicity(self, variant, method):
         # Test that result increases monotonically with respect to input.
         m, n = 10, 7
@@ -6842,6 +6847,12 @@ class TestCombinePvalues:
             for pvalues in pvaluess
         ]
         assert np.all(np.diff(combined_pvalues) >= 0)
+
+    @pytest.mark.parametrize("method", methods)
+    def test_result(self, method):
+        res = stats.combine_pvalues([.01, .2, .3], method=method)
+        assert_equal((res.statistic, res.pvalue), res)
+
 
 class TestCdfDistanceValidation:
     """
