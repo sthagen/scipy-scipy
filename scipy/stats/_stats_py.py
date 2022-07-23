@@ -318,14 +318,15 @@ def gmean(a, axis=0, dtype=None, weights=None):
     """
     if not isinstance(a, np.ndarray):
         # if not an ndarray object attempt to convert it
-        log_a = np.log(np.array(a, dtype=dtype))
+        a = np.array(a, dtype=dtype)
     elif dtype:
         # Must change the default dtype allowing array type
         if isinstance(a, np.ma.MaskedArray):
-            log_a = np.log(np.ma.asarray(a, dtype=dtype))
+            a = np.ma.asarray(a, dtype=dtype)
         else:
-            log_a = np.log(np.asarray(a, dtype=dtype))
-    else:
+            a = np.asarray(a, dtype=dtype)
+
+    with np.errstate(divide='ignore'):
         log_a = np.log(a)
 
     if weights is not None:
@@ -666,7 +667,7 @@ def mode(a, axis=0, nan_policy='propagate', keepdims=None):
 
     if contains_nan and nan_policy == 'omit':
         a = ma.masked_invalid(a)
-        return mstats_basic.mode(a, axis, _keepdims=keepdims)
+        return mstats_basic._mode(a, axis, keepdims=keepdims)
 
     if not np.issubdtype(a.dtype, np.number):
         warnings.warn("Support for non-numeric arrays has been deprecated "
