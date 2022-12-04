@@ -17,8 +17,7 @@ from scipy.stats._distr_params import distdiscrete, invdistdiscrete
 from scipy.stats._distn_infrastructure import rv_discrete_frozen
 
 vals = ([1, 2, 3, 4], [0.1, 0.2, 0.3, 0.4])
-distdiscrete += [[stats.rv_discrete(values=vals), ()],
-                 [stats.rv_count(xk=vals[0], pk=vals[1]), ()]]
+distdiscrete += [[stats.rv_discrete(values=vals), ()]]
 
 # For these distributions, test_discrete_basic only runs with test mode full
 distslow = {'zipfian', 'nhypergeom'}
@@ -184,9 +183,20 @@ def test_isf_with_loc(dist, args):
 
 
 def check_cdf_ppf(distfn, arg, supp, msg):
+    # supp is assumed to be an array of integers in the support of distfn
+    # (but not necessarily all the integers in the support).
+    # This test assumes that the PMF of any value in the support of the
+    # distribution is greater than 1e-8.
+
     # cdf is a step function, and ppf(q) = min{k : cdf(k) >= q, k integer}
-    npt.assert_array_equal(distfn.ppf(distfn.cdf(supp, *arg), *arg),
+    cdf_supp = distfn.cdf(supp, *arg)
+    # In very rare cases, the finite precision calculation of ppf(cdf(supp))
+    # can produce an array in which an element is off by one.  We nudge the
+    # CDF values down by 10 ULPs help to avoid this.
+    cdf_supp0 = cdf_supp - 10*np.spacing(cdf_supp)
+    npt.assert_array_equal(distfn.ppf(cdf_supp0, *arg),
                            supp, msg + '-roundtrip')
+    # Repeat the same calculation, but with the CDF values decreased by 1e-8.
     npt.assert_array_equal(distfn.ppf(distfn.cdf(supp, *arg) - 1e-8, *arg),
                            supp, msg + '-roundtrip')
 
@@ -195,7 +205,6 @@ def check_cdf_ppf(distfn, arg, supp, msg):
         supp1 = supp[supp < _b]
         npt.assert_array_equal(distfn.ppf(distfn.cdf(supp1, *arg) + 1e-8, *arg),
                                supp1 + distfn.inc, msg + ' ppf-cdf-next')
-        # -1e-8 could cause an error if pmf < 1e-8
 
 
 def check_pmf_cdf(distfn, arg, distname):
