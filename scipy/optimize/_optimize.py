@@ -27,6 +27,7 @@ __docformat__ = "restructuredtext en"
 
 import warnings
 import sys
+import inspect
 from numpy import (atleast_1d, eye, argmin, zeros, shape, squeeze,
                    asarray, sqrt, Inf, asfarray)
 import numpy as np
@@ -129,6 +130,58 @@ def _dict_formatter(d, n=0, mplus=1, sorter=None):
                              formatter={'float_kind': _float_formatter_10}):
             s = str(d)
     return s
+
+
+def _wrap_callback(callback, method=None):
+    """Wrap a user-provided callback so that attributes can be attached."""
+    if callback is None or method not in {'nelder-mead', 'trust-constr', None}:
+        return callback  # don't wrap
+
+    p1 = (inspect.Parameter('intermediate_result',
+                            kind=inspect.Parameter.POSITIONAL_OR_KEYWORD),)
+    p2 = (inspect.Parameter('intermediate_result',
+                            kind=inspect.Parameter.KEYWORD_ONLY),)
+    sig1 = inspect.Signature(parameters=p1)
+    sig2 = inspect.Signature(parameters=p2)
+
+    if inspect.signature(callback) in {sig1, sig2}:
+        def wrapped_callback(res):
+            return callback(intermediate_result=res)
+    elif method == 'trust-constr':
+        def wrapped_callback(res):
+            return callback(np.copy(res.x), res)
+    else:
+        def wrapped_callback(res):
+            return callback(np.copy(res.x))
+
+    wrapped_callback.stop_iteration = False
+    return wrapped_callback
+
+
+def _call_callback_maybe_halt(callback, res):
+    """Call wrapped callback; return True if minimization should stop.
+
+    Parameters
+    ----------
+    callback : callable or None
+        A user-provided callback wrapped with `_wrap_callback`
+    res : OptimizeResult
+        Information about the current iterate
+
+    Returns
+    -------
+    halt : bool
+        True if minimization should stop
+
+    """
+    if callback is None:
+        return False
+    try:
+        callback(res)
+        return False
+    except StopIteration:
+        callback.stop_iteration = True  # make `minimize` override status/msg
+        return True
 
 
 class OptimizeResult(dict):
@@ -692,6 +745,7 @@ def fmin(func, x0, args=(), xtol=1e-4, ftol=1e-4, maxiter=None, maxfun=None,
             'return_all': retall,
             'initial_simplex': initial_simplex}
 
+    callback = _wrap_callback(callback)
     res = _minimize_neldermead(func, x0, args, callback=callback, **opts)
     if full_output:
         retlist = res['x'], res['fun'], res['nit'], res['nfev'], res['status']
@@ -926,10 +980,11 @@ def _minimize_neldermead(func, x0, args=(), callback=None,
             ind = np.argsort(fsim)
             sim = np.take(sim, ind, 0)
             fsim = np.take(fsim, ind, 0)
-            if callback is not None:
-                callback(sim[0])
             if retall:
                 allvecs.append(sim[0])
+            intermediate_result = OptimizeResult(x=sim[0], fun=fsim[0])
+            if _call_callback_maybe_halt(callback, intermediate_result):
+                break
 
     x = sim[0]
     fval = np.min(fsim)
@@ -2110,7 +2165,7 @@ def fminbound(func, x1, x2, args=(), xtol=1e-5, maxfun=500,
         Parameters (over given interval) which minimize the
         objective function.
     fval : number
-        The function value at the minimum point.
+        The function value evaluated at the minimizer.
     ierr : int
         An error flag (0 if converged, 1 if maximum number of
         function calls reached).
@@ -2128,22 +2183,34 @@ def fminbound(func, x1, x2, args=(), xtol=1e-5, maxfun=500,
     interval x1 < xopt < x2 using Brent's method. (See `brent`
     for auto-bracketing.)
 
+    References
+    ----------
+    .. [1] Forsythe, G.E., M. A. Malcolm, and C. B. Moler. "Computer Methods
+           for Mathematical Computations." Prentice-Hall Series in Automatic
+           Computation 259 (1977).
+    .. [2] Brent, Richard P. Algorithms for Minimization Without Derivatives.
+           Courier Corporation, 2013.
+
     Examples
     --------
-    `fminbound` finds the minimum of the function in the given range.
-    The following examples illustrate the same
-
-    >>> def f(x):
-    ...     return x**2
+    `fminbound` finds the minimizer of the function in the given range.
+    The following examples illustrate this.
 
     >>> from scipy import optimize
-
-    >>> minimum = optimize.fminbound(f, -1, 2)
+    >>> def f(x):
+    ...     return (x-1)**2
+    >>> minimizer = optimize.fminbound(f, -4, 4)
+    >>> minimizer
+    1.0
+    >>> minimum = f(minimizer)
     >>> minimum
     0.0
-    >>> minimum = optimize.fminbound(f, 1, 2)
+    >>> minimizer = optimize.fminbound(f, 3, 4)
+    >>> minimizer
+    3.000005960860986
+    >>> minimum = f(minimizer)
     >>> minimum
-    1.0000059608609866
+    4.000023843479476
     """
     options = {'xatol': xtol,
                'maxiter': maxfun,

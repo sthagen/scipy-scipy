@@ -18,7 +18,8 @@ import numpy as np
 from ._optimize import (_minimize_neldermead, _minimize_powell, _minimize_cg,
                         _minimize_bfgs, _minimize_newtoncg,
                         _minimize_scalar_brent, _minimize_scalar_bounded,
-                        _minimize_scalar_golden, MemoizeJac, OptimizeResult)
+                        _minimize_scalar_golden, MemoizeJac, OptimizeResult,
+                        _wrap_callback)
 from ._trustregion_dogleg import _minimize_dogleg
 from ._trustregion_ncg import _minimize_trust_ncg
 from ._trustregion_krylov import _minimize_trust_krylov
@@ -39,6 +40,9 @@ from ._differentiable_functions import FD_METHODS
 MINIMIZE_METHODS = ['nelder-mead', 'powell', 'cg', 'bfgs', 'newton-cg',
                     'l-bfgs-b', 'tnc', 'cobyla', 'slsqp', 'trust-constr',
                     'dogleg', 'trust-ncg', 'trust-exact', 'trust-krylov']
+
+# These methods support the new callback interface (passed an OptimizeResult)
+MINIMIZE_METHODS_NEW_CB = ['nelder-mead', 'trust-constr']
 
 MINIMIZE_SCALAR_METHODS = ['brent', 'bounded', 'golden']
 
@@ -190,16 +194,21 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
 
         For method-specific options, see :func:`show_options()`.
     callback : callable, optional
-        Called after each iteration. For 'trust-constr' it is a callable with
+        A callable called after each iteration.
+
+        Methods nelder-mead and trust-constr support a callable with
         the signature:
 
-            ``callback(xk, OptimizeResult state) -> bool``
+            ``callback(OptimizeResult: intermediate_result)``
 
-        where ``xk`` is the current parameter vector. and ``state``
-        is an `OptimizeResult` object, with the same fields
-        as the ones from the return. If callback returns True
-        the algorithm execution is terminated.
-        For all the other methods, the signature is:
+        where ``intermediate_result`` is a keyword parameter containing an
+        `OptimizeResult` with attributes ``x`` and ``fun``, the present values
+        of the parameter vector and objective function. Note that the name
+        of the parameter must be ``intermediate_result`` for the callback
+        to be passed an `OptimizeResult`. These methods will also terminate if
+        the callback raises `StopIteration`.
+
+        All methods except trust-constr support a signature like:
 
             ``callback(xk)``
 
@@ -515,11 +524,7 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
     x0 = np.atleast_1d(np.asarray(x0))
 
     if x0.ndim != 1:
-        message = ('Use of `minimize` with `x0.ndim != 1` is deprecated. '
-                   'Currently, singleton dimensions will be removed from '
-                   '`x0`, but an error will be raised in SciPy 1.11.0.')
-        warn(message, DeprecationWarning, stacklevel=2)
-        x0 = np.atleast_1d(np.squeeze(x0))
+        raise ValueError("'x0' must only have one dimension.")
 
     if x0.dtype.kind in np.typecodes["AllInteger"]:
         x0 = np.asarray(x0, dtype=float)
@@ -680,6 +685,8 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
                                                        remove=1)
         bounds = standardize_bounds(bounds, x0, meth)
 
+    callback = _wrap_callback(callback, meth)
+
     if meth == 'nelder-mead':
         res = _minimize_neldermead(fun, x0, args, callback, bounds=bounds,
                                    **options)
@@ -728,6 +735,11 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
         res.jac = _add_to_array(res.jac, i_fixed, np.nan)
         if "hess_inv" in res:
             res.hess_inv = None  # unknown
+
+    if getattr(callback, 'stop_iteration', False):
+        res.success = False
+        res.status = 99
+        res.message = "`callback` raised `StopIteration`."
 
     return res
 
@@ -797,17 +809,17 @@ def minimize_scalar(fun, bracket=None, bounds=None, args=(),
     'method' parameter. The default method is *Brent*.
 
     Method :ref:`Brent <optimize.minimize_scalar-brent>` uses Brent's
-    algorithm to find a local minimum.  The algorithm uses inverse
+    algorithm [1]_ to find a local minimum.  The algorithm uses inverse
     parabolic interpolation when possible to speed up convergence of
     the golden section method.
 
     Method :ref:`Golden <optimize.minimize_scalar-golden>` uses the
-    golden section search technique. It uses analog of the bisection
+    golden section search technique [1]_. It uses analog of the bisection
     method to decrease the bracketed interval. It is usually
     preferable to use the *Brent* method.
 
     Method :ref:`Bounded <optimize.minimize_scalar-bounded>` can
-    perform bounded minimization. It uses the Brent method to find a
+    perform bounded minimization [2]_ [3]_. It uses the Brent method to find a
     local minimum in the interval x1 < xopt < x2.
 
     **Custom minimizers**
@@ -829,6 +841,16 @@ def minimize_scalar(fun, bracket=None, bounds=None, args=(),
 
     .. versionadded:: 0.11.0
 
+    References
+    ----------
+    .. [1] Press, W., S.A. Teukolsky, W.T. Vetterling, and B.P. Flannery.
+           Numerical Recipes in C. Cambridge University Press.
+    .. [2] Forsythe, G.E., M. A. Malcolm, and C. B. Moler. "Computer Methods
+           for Mathematical Computations." Prentice-Hall Series in Automatic
+           Computation 259 (1977).
+    .. [3] Brent, Richard P. Algorithms for Minimization Without Derivatives.
+           Courier Corporation, 2013.
+
     Examples
     --------
     Consider the problem of minimizing the following function.
@@ -840,6 +862,11 @@ def minimize_scalar(fun, bracket=None, bounds=None, args=(),
 
     >>> from scipy.optimize import minimize_scalar
     >>> res = minimize_scalar(f)
+    >>> res.fun
+    -9.9149495908
+
+    The minimizer is:
+
     >>> res.x
     1.28077640403
 
@@ -847,7 +874,9 @@ def minimize_scalar(fun, bracket=None, bounds=None, args=(),
     bounds as:
 
     >>> res = minimize_scalar(f, bounds=(-3, -1), method='bounded')
-    >>> res.x
+    >>> res.fun  # minimum
+    3.28365179850e-13
+    >>> res.x  # minimizer
     -2.0000002026
 
     """

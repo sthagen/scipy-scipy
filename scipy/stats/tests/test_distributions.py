@@ -82,9 +82,6 @@ def test_distributions_submodule():
     # <scipy.stats._continuous_distns.trapezoid_gen at 0x1df83bbc688>
     expected = set(filter(lambda s: not str(s).startswith('<'), expected))
 
-    # gilbrat is deprecated and no longer in distcont
-    actual.remove('gilbrat')
-
     assert actual == expected
 
 
@@ -899,6 +896,76 @@ class TestGennorm:
         assert stats.kstest(rvs[:, 0, 1], stats.gennorm(1.0).cdf)[1] > 0.1
         assert stats.kstest(rvs[:, 1, 0], stats.gennorm(2.0).cdf)[1] > 0.1
         assert stats.kstest(rvs[:, 1, 1], stats.gennorm(5.0).cdf)[1] > 0.1
+
+
+class TestGibrat:
+
+    # sfx is sf(x).  The values were computed with mpmath:
+    #
+    #   from mpmath import mp
+    #   mp.dps = 100
+    #   def gibrat_sf(x):
+    #       return 1 - mp.ncdf(mp.log(x))
+    #
+    # E.g.
+    #
+    #   >>> float(gibrat_sf(1.5))
+    #   0.3425678305148459
+    #
+    @pytest.mark.parametrize('x, sfx', [(1.5, 0.3425678305148459),
+                                        (5000, 8.173334352522493e-18)])
+    def test_sf_isf(self, x, sfx):
+        assert_allclose(stats.gibrat.sf(x), sfx, rtol=2e-14)
+        assert_allclose(stats.gibrat.isf(sfx), x, rtol=2e-14)
+
+
+class TestGompertz:
+
+    def test_gompertz_accuracy(self):
+        # Regression test for gh-4031
+        p = stats.gompertz.ppf(stats.gompertz.cdf(1e-100, 1), 1)
+        assert_allclose(p, 1e-100)
+
+    # sfx is sf(x).  The values were computed with mpmath:
+    #
+    #   from mpmath import mp
+    #   mp.dps = 100
+    #   def gompertz_sf(x, c):
+    #       reurn mp.exp(-c*mp.expm1(x))
+    #
+    # E.g.
+    #
+    #   >>> float(gompertz_sf(1, 2.5))
+    #   0.013626967146253437
+    #
+    @pytest.mark.parametrize('x, c, sfx', [(1, 2.5, 0.013626967146253437),
+                                           (3, 2.5, 1.8973243273704087e-21),
+                                           (0.05, 5, 0.7738668242570479),
+                                           (2.25, 5, 3.707795833465481e-19)])
+    def test_sf_isf(self, x, c, sfx):
+        assert_allclose(stats.gompertz.sf(x, c), sfx, rtol=1e-14)
+        assert_allclose(stats.gompertz.isf(sfx, c), x, rtol=1e-14)
+
+
+class TestHalfNorm:
+
+    # sfx is sf(x).  The values were computed with mpmath:
+    #
+    #   from mpmath import mp
+    #   mp.dps = 100
+    #   def halfnorm_sf(x):
+    #       reurn 2*(1 - mp.ncdf(x))
+    #
+    # E.g.
+    #
+    #   >>> float(halfnorm_sf(1))
+    #   0.3173105078629141
+    #
+    @pytest.mark.parametrize('x, sfx', [(1, 0.3173105078629141),
+                                        (10, 1.523970604832105e-23)])
+    def test_sf_isf(self, x, sfx):
+        assert_allclose(stats.halfnorm.sf(x), sfx, rtol=1e-14)
+        assert_allclose(stats.halfnorm.isf(sfx), x, rtol=1e-14)
 
 
 class TestHalfgennorm:
@@ -2470,7 +2537,15 @@ class TestLaplace:
         assert_allclose(x, -np.log(2*p), rtol=1e-13)
 
 
-class TestPowerlaw(object):
+class TestPowerlaw:
+
+    # In the following data, `sf` was computed with mpmath.
+    @pytest.mark.parametrize('x, a, sf',
+                             [(0.25, 2.0, 0.9375),
+                              (0.99609375, 1/256, 1.528855235208108e-05)])
+    def test_sf(self, x, a, sf):
+        assert_allclose(stats.powerlaw.sf(x, a), sf, rtol=1e-15)
+
     @pytest.fixture(scope='function')
     def rng(self):
         return np.random.default_rng(1234)
@@ -3450,6 +3525,33 @@ class TestBetaPrime:
         gen_cdf = stats.rv_continuous._cdf_single
         cdfs_g = [gen_cdf(stats.betaprime, val, alpha, beta) for val in x]
         assert_allclose(cdfs, cdfs_g, atol=0, rtol=2e-12)
+
+    # The expected values for test_ppf() were computed with mpmath, e.g.
+    #
+    #   from mpmath import mp
+    #   mp.dps = 125
+    #   p = 0.01
+    #   a, b = 1.25, 2.5
+    #   x = mp.findroot(lambda t: mp.betainc(a, b, x1=0, x2=t/(1+t),
+    #                                        regularized=True) - p,
+    #                   x0=(0.01, 0.011), method='secant')
+    #   print(float(x))
+    #
+    # prints
+    #
+    #   0.01080162700956614
+    #
+    @pytest.mark.parametrize(
+        'p, a, b, expected',
+        [(0.010, 1.25, 2.5, 0.01080162700956614),
+         (1e-12, 1.25, 2.5, 1.0610141996279122e-10),
+         (1e-18, 1.25, 2.5, 1.6815941817974941e-15),
+         (1e-17, 0.25, 7.0, 1.0179194531881782e-69),
+         (0.375, 0.25, 7.0, 0.002036820346115211)],
+    )
+    def test_ppf(self, p, a, b, expected):
+        p = stats.betaprime.ppf(p, a, b)
+        assert_allclose(p, expected, rtol=1e-14)
 
 
 class TestGamma:
@@ -5983,12 +6085,6 @@ def test_540_567():
                         decimal=10, err_msg='test_540_567')
 
 
-def test_regression_ticket_1316():
-    # The following was raising an exception, because _construct_default_doc()
-    # did not handle the default keyword extradoc=None.  See ticket #1316.
-    stats._continuous_distns.gamma_gen(name='gamma')
-
-
 def test_regression_ticket_1326():
     # adjust to avoid nan with 0*log(0)
     assert_almost_equal(stats.chi2.pdf(0.0, 2), 0.5, 14)
@@ -6731,12 +6827,6 @@ def test_infinite_input():
 def test_lomax_accuracy():
     # regression test for gh-4033
     p = stats.lomax.ppf(stats.lomax.cdf(1e-100, 1), 1)
-    assert_allclose(p, 1e-100)
-
-
-def test_gompertz_accuracy():
-    # Regression test for gh-4031
-    p = stats.gompertz.ppf(stats.gompertz.cdf(1e-100, 1), 1)
     assert_allclose(p, 1e-100)
 
 

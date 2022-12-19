@@ -870,6 +870,10 @@ class betaprime_gen(rv_continuous):
     def _cdf(self, x, a, b):
         return sc.betainc(a, b, x/(1.+x))
 
+    def _ppf(self, p, a, b):
+        r = sc.betaincinv(a, b, p)
+        return r / (1 - r)
+
     def _munp(self, n, a, b):
         if n == 1.0:
             return np.where(b > 1,
@@ -3597,6 +3601,12 @@ class gompertz_gen(rv_continuous):
     def _ppf(self, q, c):
         return sc.log1p(-1.0 / c * sc.log1p(-q))
 
+    def _sf(self, x, c):
+        return np.exp(-c * sc.expm1(x))
+
+    def _isf(self, p, c):
+        return sc.log1p(-np.log(p)/c)
+
     def _entropy(self, c):
         return 1.0 - np.log(c) - np.exp(c)*sc.expn(1, c)
 
@@ -3963,6 +3973,12 @@ class halfnorm_gen(rv_continuous):
 
     def _ppf(self, q):
         return sc.ndtri((1+q)/2.0)
+
+    def _sf(self, x):
+        return 2 * _norm_sf(x)
+
+    def _isf(self, p):
+        return -sc.ndtri(p/2)
 
     def _stats(self):
         return (np.sqrt(2.0/np.pi),
@@ -5768,6 +5784,12 @@ class gibrat_gen(rv_continuous):
     def _ppf(self, q):
         return np.exp(_norm_ppf(q))
 
+    def _sf(self, x):
+        return _norm_sf(np.log(x))
+
+    def _isf(self, p):
+        return np.exp(_norm_isf(p))
+
     def _stats(self):
         p = np.e
         mu = np.sqrt(p)
@@ -5780,45 +5802,7 @@ class gibrat_gen(rv_continuous):
         return 0.5 * np.log(2 * np.pi) + 0.5
 
 
-# deprecation of gilbrat, see #15911
-deprmsg = ("`gilbrat` is a misspelling of the correct name for the `gibrat` "
-           "distribution, and will be removed in SciPy 1.11.")
-
-
-class gilbrat_gen(gibrat_gen):
-    # override __call__ protocol from rv_generic to also
-    # deprecate instantiation of frozen distributions
-    r"""
-
-    .. deprecated:: 1.9.0
-        `gilbrat` is deprecated, use `gibrat` instead!
-        `gilbrat` is a misspelling of the correct name for the `gibrat`
-        distribution, and will be removed in SciPy 1.11.
-
-    """
-    def __call__(self, *args, **kwds):
-        # align with warning text from np.deprecated that's used for methods
-        msg = "`gilbrat` is deprecated, use `gibrat` instead!\n" + deprmsg
-        warnings.warn(msg, DeprecationWarning, stacklevel=2)
-        return self.freeze(*args, **kwds)
-
-
 gibrat = gibrat_gen(a=0.0, name='gibrat')
-gilbrat = gilbrat_gen(a=0.0, name='gilbrat')
-
-
-# since the deprecated class gets intantiated upon import (and we only want to
-# warn upon use), add the deprecation to each (documented) class method, c.f.
-# https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.gilbrat.html
-_gibrat_method_names = [
-    "cdf", "entropy", "expect", "fit", "interval", "isf", "logcdf", "logpdf",
-    "logsf", "mean", "median", "moment", "pdf", "ppf", "rvs", "sf", "stats",
-    "std", "var"
-]
-for m in _gibrat_method_names:
-    wrapper = np.deprecate(getattr(gilbrat, m), f"gilbrat.{m}", f"gibrat.{m}",
-                           deprmsg)
-    setattr(gilbrat, m, wrapper)
 
 
 class maxwell_gen(rv_continuous):
@@ -7293,6 +7277,9 @@ class powerlaw_gen(rv_continuous):
 
     def _ppf(self, q, a):
         return pow(q, 1.0/a)
+
+    def _sf(self, p, a):
+        return -sc.powm1(p, a)
 
     def _stats(self, a):
         return (a / (a + 1.0),
