@@ -445,6 +445,22 @@ class TestChi:
         x = stats.chi.mean(df=1000)
         assert_allclose(x, self.CHI_MEAN_1000, rtol=1e-12)
 
+    # Entropy references values were computed with the following mpmath code
+    # from mpmath import mp
+    # mp.dps = 50
+    # def chi_entropy_mpmath(df):
+    #     df = mp.mpf(df)
+    #     half_df = 0.5 * df
+    #     entropy = mp.log(mp.gamma(half_df)) + 0.5 * \
+    #               (df - mp.log(2) - (df -1) * mp.digamma(half_df))
+    #     return float(entropy)
+
+    @pytest.mark.parametrize('df, ref',
+                             [(1, 0.7257913526447274),
+                              (500, 1.0720309422146606),
+                              (1e8, 1.0723649412580334)])
+    def test_entropy(self, df, ref):
+        assert_allclose(stats.chi(df).entropy(), ref)
 
 class TestNBinom:
     def setup_method(self):
@@ -1196,14 +1212,6 @@ class TestTruncnorm:
                         0.9999987259565643)
         assert_allclose(stats.truncnorm(8, np.inf).cdf(8.3),
                         0.9163220907327540)
-
-    def _test_moments_one_range(self, a, b, expected, rtol=1e-7):
-        m0, v0, s0, k0 = expected[:4]
-        m, v, s, k = stats.truncnorm.stats(a, b, moments='mvsk')
-        assert_allclose(m, m0)
-        assert_allclose(v, v0)
-        assert_allclose(s, s0, rtol=rtol)
-        assert_allclose(k, k0, rtol=rtol)
 
     # Test data for the truncnorm stats() method.
     # The data in each row is:
@@ -3558,6 +3566,23 @@ class TestBeta:
             # this try-except wrapper and just call the function.
             pass
 
+    # entropy accuracy was confirmed using the following mpmath function
+    # from mpmath import mp
+    # mp.dps = 50
+    # def beta_entropy_mpmath(a, b):
+    #     a = mp.mpf(a)
+    #     b = mp.mpf(b)
+    #     entropy = mp.log(mp.beta(a, b)) - (a - 1) * mp.digamma(a) -\
+    #              (b - 1) * mp.digamma(b) + (a + b -2) * mp.digamma(a + b)
+    #     return float(entropy)
+
+    @pytest.mark.parametrize('a, b, ref',
+                             [(0.5, 0.5, -0.24156447527049044),
+                              (0.001, 1, -992.0922447210179),
+                              (1, 10000, -8.210440371976183),
+                              (100000, 100000, -5.377247470132859)])
+    def test_entropy(self, a, b, ref):
+        assert_allclose(stats.beta(a, b).entropy(), ref)
 
 class TestBetaPrime:
     def test_logpdf(self):
@@ -3674,6 +3699,23 @@ class TestChi2:
         assert_allclose(x, 1.0106330688195199050507943e-11, rtol=1e-10)
         x = stats.chi2.ppf(0.1, df)
         assert_allclose(x, 7.041504580095461859307179763, rtol=1e-10)
+
+    # Entropy references values were computed with the following mpmath code
+    # from mpmath import mp
+    # mp.dps = 50
+    # def chisq_entropy_mpmath(df):
+    #     df = mp.mpf(df)
+    #     half_df = 0.5 * df
+    #     entropy = half_df + mp.log(2) + mp.log(mp.gamma(half_df)) + \
+    #              (1 - half_df) * mp.digamma(half_df)
+    # return float(entropy)
+
+    @pytest.mark.parametrize('df, ref',
+                             [(1, 0.7837571104739337),
+                              (100, 4.061397128938114),
+                              (10000, 6.370615639472648)])
+    def test_entropy(self, df, ref):
+        assert_allclose(stats.chi2(df).entropy(), ref)
 
 
 class TestGumbelL:
@@ -4456,20 +4498,20 @@ class TestDocstring:
         stats.rv_discrete()
 
 
-def TestArgsreduce():
+def test_args_reduce():
     a = array([1, 3, 2, 1, 2, 3, 3])
     b, c = argsreduce(a > 1, a, 2)
 
     assert_array_equal(b, [3, 2, 2, 3, 3])
-    assert_array_equal(c, [2, 2, 2, 2, 2])
+    assert_array_equal(c, [2])
 
     b, c = argsreduce(2 > 1, a, 2)
-    assert_array_equal(b, a[0])
-    assert_array_equal(c, [2])
+    assert_array_equal(b, a)
+    assert_array_equal(c, [2] * np.size(a))
 
     b, c = argsreduce(a > 0, a, 2)
     assert_array_equal(b, a)
-    assert_array_equal(c, [2] * numpy.size(a))
+    assert_array_equal(c, [2] * np.size(a))
 
 
 class TestFitMethod:
@@ -6873,7 +6915,7 @@ class TestSubclassingExplicitShapes:
         dist = _distr_gen(shapes='extra_kwarg')
         assert_equal(dist.pdf(1, extra_kwarg=3), stats.norm.pdf(1))
 
-    def shapes_empty_string(self):
+    def test_shapes_empty_string(self):
         # shapes='' is equivalent to shapes=None
         class _dist_gen(stats.rv_continuous):
             def _pdf(self, x):
