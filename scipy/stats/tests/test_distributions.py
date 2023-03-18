@@ -198,6 +198,29 @@ class TestVonMises:
         assert_allclose(np.angle(res), loc % (2*np.pi))
         assert np.issubdtype(res.dtype, np.complexfloating)
 
+    @pytest.mark.xslow
+    @pytest.mark.parametrize("rvs_loc", [0, 2])
+    @pytest.mark.parametrize("rvs_shape", [1, 100])
+    @pytest.mark.parametrize('fix_loc', [True, False])
+    @pytest.mark.parametrize('fix_shape', [True, False])
+    def test_fit_MLE_comp_optimizer(self, rvs_loc, rvs_shape,
+                                    fix_loc, fix_shape):
+        if fix_shape and fix_loc:
+            pytest.skip("Nothing to fit.")
+
+        rng = np.random.default_rng(6762668991392531563)
+        data = stats.vonmises.rvs(rvs_shape, size=1000, loc=rvs_loc,
+                                  random_state=rng)
+
+        kwds = {'fscale': 1}
+        if fix_loc:
+            kwds['floc'] = rvs_loc
+        if fix_shape:
+            kwds['f0'] = rvs_shape
+
+        _assert_less_or_close_loglike(stats.vonmises, data,
+                                      stats.vonmises.nnlf, **kwds)
+
     @pytest.mark.parametrize('loc', [-0.5 * np.pi, 0, np.pi])
     @pytest.mark.parametrize('kappa', [1, 10, 100, 1000])
     def test_vonmises_fit_all(self, kappa, loc):
@@ -2723,7 +2746,7 @@ class TestLaplace:
     @pytest.mark.parametrize("rvs_loc,rvs_scale", [(-5, 10),
                                                    (10, 5),
                                                    (0.5, 0.2)])
-    def test_fit_MLE_comp_optimzer(self, rvs_loc, rvs_scale):
+    def test_fit_MLE_comp_optimizer(self, rvs_loc, rvs_scale):
         data = stats.laplace.rvs(size=1000, loc=rvs_loc, scale=rvs_scale)
 
         # the log-likelihood function for laplace is given by
@@ -2863,6 +2886,66 @@ class TestPowerlaw:
         dist = stats.powerlaw
         with np.errstate(over='ignore'):
             _assert_less_or_close_loglike(dist, data)
+
+
+class TestPowerLogNorm:
+
+    # reference values were computed via mpmath
+    # from mpmath import mp
+    # mp.dps = 80
+    # def powerlognorm_sf_mp(x, c, s):
+    #     x = mp.mpf(x)
+    #     c = mp.mpf(c)
+    #     s = mp.mpf(s)
+    #     return mp.ncdf(-mp.log(x) / s)**c
+    #
+    # def powerlognormal_cdf_mp(x, c, s):
+    #     return mp.one - powerlognorm_sf_mp(x, c, s)
+    #
+    # x, c, s = 100, 20, 1
+    # print(float(powerlognorm_sf_mp(x, c, s)))
+
+    @pytest.mark.parametrize("x, c, s, ref",
+                             [(100, 20, 1, 1.9057100820561928e-114),
+                              (1e-3, 20, 1, 0.9999999999507617),
+                              (1e-3, 0.02, 1, 0.9999999999999508),
+                              (1e22, 0.02, 1, 6.50744044621611e-12)])
+    def test_sf(self, x, c, s, ref):
+        assert_allclose(stats.powerlognorm.sf(x, c, s), ref, rtol=1e-13)
+
+    # reference values were computed via mpmath using the survival
+    # function above (passing in `ref` and getting `q`).
+    @pytest.mark.parametrize("q, c, s, ref",
+                             [(0.9999999587870905, 0.02, 1, 0.01),
+                              (6.690376686108851e-233, 20, 1, 1000)])
+    def test_isf(self, q, c, s, ref):
+        assert_allclose(stats.powerlognorm.isf(q, c, s), ref, rtol=5e-11)
+
+    @pytest.mark.parametrize("x, c, s, ref",
+                             [(1e25, 0.02, 1, 0.9999999999999963),
+                              (1e-6, 0.02, 1, 2.054921078040843e-45),
+                              (1e-6, 200, 1, 2.0549210780408428e-41),
+                              (0.3, 200, 1, 0.9999999999713368)])
+    def test_cdf(self, x, c, s, ref):
+        assert_allclose(stats.powerlognorm.cdf(x, c, s), ref, rtol=3e-14)
+
+    # reference values were computed via mpmath
+    # from mpmath import mp
+    # mp.dps = 50
+    # def powerlognorm_pdf_mpmath(x, c, s):
+    #     x = mp.mpf(x)
+    #     c = mp.mpf(c)
+    #     s = mp.mpf(s)
+    #     res = (c/(x * s) * mp.npdf(mp.log(x)/s) *
+    #            mp.ncdf(-mp.log(x)/s)**(c - mp.one))
+    #     return float(res)
+
+    @pytest.mark.parametrize("x, c, s, ref",
+                             [(1e22, 0.02, 1, 6.5954987852335016e-34),
+                              (1e20, 1e-3, 1, 1.588073750563988e-22),
+                              (1e40, 1e-3, 1, 1.3179391812506349e-43)])
+    def test_pdf(self, x, c, s, ref):
+        assert_allclose(stats.powerlognorm.pdf(x, c, s), ref, rtol=3e-12)
 
 
 class TestPowerNorm:
@@ -3772,8 +3855,8 @@ class TestLognorm:
                              [e for e in product((False, True), repeat=3)
                               if False in e])
     @np.errstate(invalid="ignore")
-    def test_fit_MLE_comp_optimzer(self, rvs_shape, rvs_loc, rvs_scale,
-                                   fix_shape, fix_loc, fix_scale, rng):
+    def test_fit_MLE_comp_optimizer(self, rvs_shape, rvs_loc, rvs_scale,
+                                    fix_shape, fix_loc, fix_scale, rng):
         data = stats.lognorm.rvs(size=100, s=rvs_shape, scale=rvs_scale,
                                  loc=rvs_loc, random_state=rng)
 
@@ -6143,6 +6226,21 @@ class TestWeibull:
         assert_allclose(res, ref)
 
 
+class TestDweibull:
+    def test_entropy(self):
+        # Test that dweibull entropy follows that of weibull_min.
+        # (Generic tests check that the dweibull entropy is consistent
+        #  with its PDF. As for accuracy, dweibull entropy should be just
+        #  as accurate as weibull_min entropy. Checks of accuracy against
+        #  a reference need only be applied to the fundamental distribution -
+        #  weibull_min.)
+        rng = np.random.default_rng(8486259129157041777)
+        c = 10**rng.normal(scale=100, size=10)
+        res = stats.dweibull.entropy(c)
+        ref = stats.weibull_min.entropy(c) - np.log(0.5)
+        assert_allclose(res, ref, rtol=1e-15)
+
+
 class TestTruncWeibull:
 
     def test_pdf_bounds(self):
@@ -6944,6 +7042,24 @@ def test_gengamma_edge():
     p = stats.gengamma.pdf(0, 1, 1)
     assert_equal(p, 1.0)
 
+@pytest.mark.parametrize("a, c, ref, tol",
+                         [(1500000.0, 1, 8.529426144018633, 1e-15),
+                          (1e+30, 1, 35.95771492811536, 1e-15),
+                          (1e+100, 1, 116.54819318290696, 1e-15),
+                          (3e3, 1, 5.422011196659015, 1e-13),
+                          (3e6, -1e100, -236.29663213396054, 1e-15),
+                          (3e60, 1e-100, 1.3925371786831085e+102, 1e-15)])
+def test_gengamma_extreme_entropy(a, c, ref, tol):
+    # The reference values were calculated with mpmath:
+    # from mpmath import mp
+    # mp.dps = 500
+    #
+    # def gen_entropy(a, c):
+    #     a, c = mp.mpf(a), mp.mpf(c)
+    #     val = mp.digamma(a)
+    #     h = (a * (mp.one - val) + val/c + mp.loggamma(a) - mp.log(abs(c)))
+    #     return float(h)
+    assert_allclose(stats.gengamma.entropy(a, c), ref, rtol=tol)
 
 def test_gengamma_endpoint_with_neg_c():
     p = stats.gengamma.pdf(0, 1, -1)

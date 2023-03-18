@@ -1738,6 +1738,10 @@ class dweibull_gen(rv_continuous):
     def _stats(self, c):
         return 0, None, 0, None
 
+    def _entropy(self, c):
+        h = stats.weibull_min._entropy(c) - np.log(0.5)
+        return h
+
 
 dweibull = dweibull_gen(name='dweibull')
 
@@ -3493,8 +3497,21 @@ class gengamma_gen(rv_continuous):
         return sc.poch(a, n*1.0/c)
 
     def _entropy(self, a, c):
-        val = sc.psi(a)
-        return a*(1-val) + 1.0/c*val + sc.gammaln(a) - np.log(abs(c))
+        def regular(a, c):
+            val = sc.psi(a)
+            A = a * (1 - val) + val / c
+            B = sc.gammaln(a) - np.log(abs(c))
+            h = A + B
+            return h
+
+        def asymptotic(a, c):
+            # using asymptotic expansions for gammaln and psi (see gh-18093)
+            return (norm._entropy() - np.log(a)/2
+                    - np.log(np.abs(c)) + (a**-1.)/6 - (a**-3.)/90
+                    + (np.log(a) - (a**-1.)/2 - (a**-2.)/12 + (a**-4.)/120)/c)
+
+        h = _lazywhere(a >= 2e2, (a, c), f=asymptotic, f2=regular)
+        return h
 
 
 gengamma = gengamma_gen(a=0.0, name='gengamma')
@@ -7915,16 +7932,27 @@ class powerlognorm_gen(rv_continuous):
         return [ic, i_s]
 
     def _pdf(self, x, c, s):
-        # powerlognorm.pdf(x, c, s) = c / (x*s) * phi(log(x)/s) *
-        #                                         (Phi(-log(x)/s))**(c-1),
-        return (c/(x*s) * _norm_pdf(np.log(x)/s) *
-                pow(_norm_cdf(-np.log(x)/s), c*1.0-1.0))
+        return np.exp(self._logpdf(x, c, s))
+
+    def _logpdf(self, x, c, s):
+        return (np.log(c) - np.log(x) - np.log(s) +
+                _norm_logpdf(np.log(x) / s) +
+                _norm_logcdf(-np.log(x) / s) * (c - 1.))
 
     def _cdf(self, x, c, s):
-        return 1.0 - pow(_norm_cdf(-np.log(x)/s), c*1.0)
+        return -sc.expm1(self._logsf(x, c, s))
 
     def _ppf(self, q, c, s):
-        return np.exp(-s * _norm_ppf(pow(1.0 - q, 1.0 / c)))
+        return self._isf(1 - q, c, s)
+
+    def _sf(self, x, c, s):
+        return np.exp(self._logsf(x, c, s))
+
+    def _logsf(self, x, c, s):
+        return _norm_logcdf(-np.log(x) / s) * c
+
+    def _isf(self, q, c, s):
+        return np.exp(-_norm_ppf(q**(1/c)) * s)
 
 
 powerlognorm = powerlognorm_gen(a=0.0, name="powerlognorm")
@@ -9690,13 +9718,15 @@ class vonmises_gen(rv_continuous):
         def find_mu(data):
             return stats.circmean(data)
 
-        def find_kappa(data):
-            # kappa is the solution to
-            # r = I[1](kappa)/I[0](kappa)
-            #   = I[1](kappa) * exp(-kappa)/(I[0](kappa) * exp(-kappa))
-            #   = sc.i1e(kappa)/sc.i0e(kappa)
-            # where r = mean resultant length
-            r = 1 - stats.circvar(data)
+        def find_kappa(data, loc):
+            # Usually, sources list the following as the equation to solve for
+            # the MLE of the shape parameter:
+            # r = I[1](kappa)/I[0](kappa), where r = mean resultant length
+            # This is valid when the location is the MLE of location.
+            # More generally, when the location may be fixed at an arbitrary
+            # value, r should be defined as follows:
+            r = np.sum(np.cos(loc - data))/len(data)
+            # See gh-18128 for more information.
 
             def solve_for_kappa(kappa):
                 return sc.i1e(kappa)/sc.i0e(kappa) - r
@@ -9705,14 +9735,13 @@ class vonmises_gen(rv_continuous):
                                    bracket=(1e-8, 1e12))
             return root_res.root
 
-        if floc is None:
-            floc = find_mu(data)
-            fshape = find_kappa(data)
-        else:
-            fshape = find_kappa(data)
+        # location likelihood equation has a solution independent of kappa
+        loc = floc if floc is not None else find_mu(data)
+        # shape likelihood equation depends on location
+        shape = fshape if fshape is not None else find_kappa(data, loc)
 
-        floc = np.mod(floc + np.pi, 2 * np.pi) - np.pi  # ensure in [-pi, pi]
-        return fshape, floc, 1  # scale is not handled
+        loc = np.mod(loc + np.pi, 2 * np.pi) - np.pi  # ensure in [-pi, pi]
+        return shape, loc, 1  # scale is not handled
 
 
 vonmises = vonmises_gen(name='vonmises')
