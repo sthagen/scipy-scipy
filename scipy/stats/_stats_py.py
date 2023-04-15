@@ -49,7 +49,7 @@ from ._stats_mstats_common import (_find_repeats, linregress, theilslopes,
                                    siegelslopes)
 from ._stats import (_kendall_dis, _toint64, _weightedrankedtau,
                      _local_correlations)
-from dataclasses import make_dataclass
+from dataclasses import dataclass
 from ._hypotests import _all_partitions
 from ._stats_pythran import _compute_outer_prob_inside_method
 from ._resampling import _batch_generator
@@ -446,7 +446,7 @@ def mode(a, axis=0, nan_policy='propagate', keepdims=False):
     Parameters
     ----------
     a : array_like
-        n-dimensional array of which to find mode(s).
+        Numeric, n-dimensional array of which to find mode(s).
     axis : int or None, optional
         Axis along which to operate. Default is 0. If None, compute over
         the whole array `a`.
@@ -501,6 +501,12 @@ def mode(a, axis=0, nan_policy='propagate', keepdims=False):
 
     """  # noqa: E501
     # `axis`, `nan_policy`, and `keepdims` are handled by `_axis_nan_policy`
+    if not np.issubdtype(a.dtype, np.number):
+        message = ("Argument `a` is not recognized as numeric. "
+                   "Support for input that cannot be coerced to a numeric "
+                   "array was deprecated in SciPy 1.9.0 and removed in SciPy "
+                   "1.11.0. Please consider `pandas.DataFrame.mode`.")
+        raise TypeError(message)
 
     if a.size == 0:
         NaN = _get_nan(a)
@@ -4222,10 +4228,13 @@ def alexandergovern(*samples, nan_policy='propagate'):
 
     Returns
     -------
-    statistic : float
-        The computed A statistic of the test.
-    pvalue : float
-        The associated p-value from the chi-squared distribution.
+    res : AlexanderGovernResult
+        An object with attributes:
+
+        statistic : float
+            The computed A statistic of the test.
+        pvalue : float
+            The associated p-value from the chi-squared distribution.
 
     Warns
     -----
@@ -4358,8 +4367,10 @@ def _alexandergovern_input_validation(samples, nan_policy):
     return samples
 
 
-AlexanderGovernResult = make_dataclass("AlexanderGovernResult", ("statistic",
-                                                                 "pvalue"))
+@dataclass
+class AlexanderGovernResult:
+    statistic: float
+    pvalue: float
 
 
 def _pearsonr_fisher_ci(r, n, confidence_level, alternative):
