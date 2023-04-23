@@ -9961,6 +9961,11 @@ class vonmises_gen(rv_continuous):
 
     %(before_notes)s
 
+    See Also
+    --------
+    scipy.stats.vonmises_fisher : Von-Mises Fisher distribution on a
+                                  hypersphere
+
     Notes
     -----
     The probability density function for `vonmises` and `vonmises_line` is:
@@ -9974,7 +9979,7 @@ class vonmises_gen(rv_continuous):
 
     `vonmises` is a circular distribution which does not restrict the
     distribution to a fixed interval. Currently, there is no circular
-    distribution framework in scipy. The ``cdf`` is implemented such that
+    distribution framework in SciPy. The ``cdf`` is implemented such that
     ``cdf(x + 2*np.pi) == cdf(x) + 1``.
 
     `vonmises_line` is the same distribution, defined on :math:`[-\pi, \pi]`
@@ -10080,7 +10085,7 @@ class vonmises_gen(rv_continuous):
                     return sc.i1e(kappa)/sc.i0e(kappa) - r
 
                 root_res = root_scalar(solve_for_kappa, method="brentq",
-                                    bracket=(1e-8, 1e12))
+                                       bracket=(np.finfo(float).tiny, 1e16))
                 return root_res.root
             else:
                 # if the provided floc is very far from the circular mean,
