@@ -1,13 +1,10 @@
 """Indexing mixin for sparse matrix classes.
 """
 import numpy as np
+from warnings import warn
 from ._sputils import isintlike
 
-try:
-    INT_TYPES = (int, long, np.integer)
-except NameError:
-    # long is not defined in Python3
-    INT_TYPES = (int, np.integer)
+INT_TYPES = (int, np.integer)
 
 
 def _broadcast_arrays(a, b):
@@ -119,8 +116,8 @@ class IndexMixin:
         if i.shape != j.shape:
             raise IndexError('number of row and column indices differ')
 
-        from ._base import isspmatrix
-        if isspmatrix(x):
+        from ._base import issparse
+        if issparse(x):
             if i.ndim == 1:
                 # Inner indexing, so treat them like row vectors.
                 i = i[None]
@@ -269,8 +266,8 @@ def _unpack_index(index):
     Valid type for row/col is integer, slice, or array of integers.
     """
     # First, check if indexing with single boolean matrix.
-    from ._base import _sparray, isspmatrix
-    if (isinstance(index, (_sparray, np.ndarray)) and
+    from ._base import _spbase, issparse
+    if (isinstance(index, (_spbase, np.ndarray)) and
             index.ndim == 2 and index.dtype.kind == 'b'):
         return index.nonzero()
 
@@ -294,7 +291,7 @@ def _unpack_index(index):
         elif idx.ndim == 2:
             return idx.nonzero()
     # Next, check for validity and transform the index as needed.
-    if isspmatrix(row) or isspmatrix(col):
+    if issparse(row) or issparse(col):
         # Supporting sparse boolean indexing with both row and col does
         # not work because spmatrix.ndim is always 2.
         raise IndexError(
@@ -318,16 +315,14 @@ def _check_ellipsis(index):
     if not isinstance(index, tuple):
         return index
 
-    # TODO: Deprecate this multiple-ellipsis handling,
-    #       as numpy no longer supports it.
-
-    # Find first ellipsis.
-    for j, v in enumerate(index):
-        if v is Ellipsis:
-            first_ellipsis = j
-            break
-    else:
+    # Find any Ellipsis objects.
+    ellipsis_indices = [i for i, v in enumerate(index) if v is Ellipsis]
+    if not ellipsis_indices:
         return index
+    if len(ellipsis_indices) > 1:
+        warn('multi-Ellipsis indexing is deprecated will be removed in v1.13.',
+             DeprecationWarning, stacklevel=2)
+    first_ellipsis = ellipsis_indices[0]
 
     # Try to expand it using shortcuts for common cases
     if len(index) == 1:
