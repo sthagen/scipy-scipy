@@ -5423,6 +5423,11 @@ class laplace_asymmetric_gen(rv_continuous):
 
     %(after_notes)s
 
+    Note that the scale parameter of some references is the reciprocal of
+    SciPy's ``scale``. For example, :math:`\lambda = 1/2` in the
+    parameterization of [1]_ is equivalent to ``scale = 2`` with
+    `laplace_asymmetric`.
+
     References
     ----------
     .. [1] "Asymmetric Laplace distribution", Wikipedia
@@ -6011,6 +6016,9 @@ class loglaplace_gen(rv_continuous):
 
     def _cdf(self, x, c):
         return np.where(x < 1, 0.5*x**c, 1-0.5*x**(-c))
+
+    def _sf(self, x, c):
+        return np.where(x < 1, 1 - 0.5*x**c, 0.5*x**(-c))
 
     def _ppf(self, q, c):
         return np.where(q < 0.5, (2.0*q)**(1.0/c), (2*(1.0-q))**(-1.0/c))
@@ -7713,6 +7721,23 @@ class pearson3_gen(rv_continuous):
 
         return ans
 
+    def _sf(self, x, skew):
+        ans, x, transx, mask, invmask, _, alpha, _ = (
+            self._preprocess(x, skew))
+
+        ans[mask] = _norm_sf(x[mask])
+
+        skew = np.broadcast_to(skew, invmask.shape)
+        invmask1a = np.logical_and(invmask, skew > 0)
+        invmask1b = skew[invmask] > 0
+        ans[invmask1a] = gamma.sf(transx[invmask1b], alpha[invmask1b])
+
+        invmask2a = np.logical_and(invmask, skew < 0)
+        invmask2b = skew[invmask] < 0
+        ans[invmask2a] = gamma.cdf(transx[invmask2b], alpha[invmask2b])
+
+        return ans
+
     def _rvs(self, skew, size=None, random_state=None):
         skew = np.broadcast_to(skew, size)
         ans, _, _, mask, invmask, beta, alpha, zeta = (
@@ -8194,6 +8219,9 @@ class rdist_gen(rv_continuous):
 
     def _cdf(self, x, c):
         return beta._cdf((x + 1)/2, c/2, c/2)
+
+    def _sf(self, x, c):
+        return beta._sf((x + 1)/2, c/2, c/2)
 
     def _ppf(self, q, c):
         return 2*beta._ppf(q, c/2, c/2) - 1

@@ -86,6 +86,11 @@ class _coo_base(_data_matrix, _minmax_mixin):
           entries will be summed together.  This facilitates efficient
           construction of finite element matrices and the like. (see example)
 
+    Canonical format
+        - Entries and indices sorted by row, then column.
+        - There are no duplicate entries (i.e. duplicate (i,j) locations)
+        - Arrays MAY have explicit zeros.
+
     Examples
     --------
 
@@ -623,6 +628,8 @@ def isspmatrix_coo(x):
 # This namespace class separates array from matrix with isinstance
 class coo_array(_coo_base, sparray):
     pass
+
+coo_array.__doc__ = _coo_base.__doc__
 
 class coo_matrix(spmatrix, _coo_base):
     pass

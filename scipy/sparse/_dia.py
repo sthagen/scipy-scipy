@@ -403,12 +403,11 @@ class _dia_base(_data_matrix):
         row = row[mask]
         col = np.tile(offset_inds, num_offsets)[mask.ravel()]
         data = self.data[mask]
-
-        A = self._coo_container(
-            (data, (row, col)), shape=self.shape, dtype=self.dtype
+        # Note: this cannot set has_canonical_format=True, because despite the
+        # lack of duplicates, we do not generate sorted indices.
+        return self._coo_container(
+            (data, (row, col)), shape=self.shape, dtype=self.dtype, copy=False
         )
-        A.has_canonical_format = True
-        return A
 
     tocoo.__doc__ = _spbase.tocoo.__doc__
 
@@ -473,6 +472,8 @@ def isspmatrix_dia(x):
 # This namespace class separates array from matrix with isinstance
 class dia_array(_dia_base, sparray):
     pass
+
+dia_array.__doc__ = _dia_base.__doc__
 
 class dia_matrix(spmatrix, _dia_base):
     pass

@@ -76,6 +76,9 @@ class _csc_base(_cs_matrix):
       - slow row slicing operations (consider CSR)
       - changes to the sparsity structure are expensive (consider LIL or DOK)
 
+    Canonical format
+      - Within each column, indices are sorted by row.
+      - There are no duplicate entries.
 
     Examples
     --------
@@ -263,6 +266,8 @@ def isspmatrix_csc(x):
 # This namespace class separates array from matrix with isinstance
 class csc_array(_csc_base, sparray):
     pass
+
+csc_array.__doc__ = _csc_base.__doc__
 
 class csc_matrix(spmatrix, _csc_base):
     pass
