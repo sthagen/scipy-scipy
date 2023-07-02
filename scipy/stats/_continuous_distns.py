@@ -1116,6 +1116,10 @@ class burr_gen(rv_continuous):
     def _ppf(self, q, c, d):
         return (q**(-1.0/d) - 1)**(-1.0/c)
 
+    def _isf(self, q, c, d):
+        _q = sc.xlog1py(-1.0 / d, -q)
+        return sc.expm1(_q) ** (-1.0 / c)
+
     def _stats(self, c, d):
         nc = np.arange(1, 5).reshape(4,1) / c
         # ek is the kth raw moment, e1 is the mean e2-e1**2 variance etc.
@@ -1298,6 +1302,9 @@ class fisk_gen(burr_gen):
 
     def _ppf(self, x, c):
         return burr._ppf(x, c, 1.0)
+
+    def _isf(self, q, c):
+        return burr._isf(q, c, 1.0)
 
     def _munp(self, n, c):
         return burr._munp(n, c, 1.0)
@@ -4294,8 +4301,15 @@ class halflogistic_gen(rv_continuous):
             return scale
 
         # location is independent from the scale
-        # if not given, it is the minimum data point ([1] Equation 2.3)
-        loc = floc if floc is not None else np.min(data)
+        data_min = np.min(data)
+        if floc is not None:
+            if data_min < floc:
+                # There are values that are less than the specified loc.
+                raise FitDataError("halflogistic", lower=floc, upper=np.inf)
+            loc = floc
+        else:
+            # if not provided, location MLE is the minimal data point
+            loc = data_min
 
         # scale depends on location
         scale = fscale if fscale is not None else find_scale(data, loc)
@@ -4361,6 +4375,32 @@ class halfnorm_gen(rv_continuous):
 
     def _entropy(self):
         return 0.5*np.log(np.pi/2.0)+0.5
+
+    @_call_super_mom
+    @inherit_docstring_from(rv_continuous)
+    def fit(self, data, *args, **kwds):
+        if kwds.pop('superfit', False):
+            return super().fit(data, *args, **kwds)
+
+        data, floc, fscale = _check_fit_input_parameters(self, data,
+                                                         args, kwds)
+
+        data_min = np.min(data)
+
+        if floc is not None:
+            if data_min < floc:
+                # There are values that are less than the specified loc.
+                raise FitDataError("halfnorm", lower=floc, upper=np.inf)
+            loc = floc
+        else:
+            loc = data_min
+
+        if fscale is not None:
+            scale = fscale
+        else:
+            scale = stats.moment(data, moment=2, center=loc)**0.5
+
+        return loc, scale
 
 
 halfnorm = halfnorm_gen(a=0.0, name='halfnorm')
@@ -5361,7 +5401,7 @@ class johnsonsu_gen(rv_continuous):
         # Numerical improvements left to future enhancements.
         mu, mu2, g1, g2 = None, None, None, None
 
-        bn2 = b**-2
+        bn2 = b**-2.
         expbn2 = np.exp(bn2)
         a_b = a / b
 
