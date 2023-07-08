@@ -6143,6 +6143,9 @@ class loglaplace_gen(rv_continuous):
     def _ppf(self, q, c):
         return np.where(q < 0.5, (2.0*q)**(1.0/c), (2*(1.0-q))**(-1.0/c))
 
+    def _isf(self, q, c):
+        return np.where(q > 0.5, (2.0*(1.0 - q))**(1.0/c), (2*q)**(-1.0/c))
+
     def _munp(self, n, c):
         return c**2 / (c**2 - n**2)
 
@@ -6215,6 +6218,9 @@ class lognorm_gen(rv_continuous):
 
     def _logsf(self, x, s):
         return _norm_logsf(np.log(x) / s)
+
+    def _isf(self, q, s):
+        return np.exp(s * _norm_isf(q))
 
     def _stats(self, s):
         p = np.exp(s*s)
@@ -7521,6 +7527,9 @@ class pareto_gen(rv_continuous):
     def _sf(self, x, b):
         return x**(-b)
 
+    def _isf(self, q, b):
+        return np.power(q, -1.0 / b)
+
     def _stats(self, b, moments='mv'):
         mu, mu2, g1, g2 = None, None, None, None
         if 'm' in moments:
@@ -7686,6 +7695,9 @@ class lomax_gen(rv_continuous):
 
     def _ppf(self, q, c):
         return sc.expm1(-sc.log1p(-q)/c)
+
+    def _isf(self, q, c):
+        return q**(-1.0 / c) - 1
 
     def _stats(self, c):
         mu, mu2, g1, g2 = pareto.stats(c, loc=-1.0, moments='mvsk')
@@ -9002,6 +9014,11 @@ class skewnorm_gen(rv_continuous):
         def skew_d(d):  # skewness in terms of delta
             return (4-np.pi)/2 * ((d * np.sqrt(2 / np.pi))**3
                                   / (1 - 2*d**2 / np.pi)**(3/2))
+        def d_skew(skew):  # delta in terms of skewness
+            s_23 = np.abs(skew)**(2/3)
+            return np.sign(skew) * np.sqrt(
+                np.pi/2 * s_23 / (s_23 + ((4 - np.pi)/2)**(2/3))
+            )
 
         # If skewness of data is greater than max possible population skewness,
         # MoM won't provide a good guess. Get out early.
@@ -9023,7 +9040,7 @@ class skewnorm_gen(rv_continuous):
             # Solve for a that matches sample distribution skewness to sample
             # skewness.
             s = np.clip(s, -s_max, s_max)
-            d = root_scalar(lambda d: skew_d(d) - s, bracket=[-1, 1]).root
+            d = d_skew(s)
             with np.errstate(divide='ignore'):
                 a = np.sqrt(np.divide(d**2, (1-d**2)))*np.sign(s)
         else:
