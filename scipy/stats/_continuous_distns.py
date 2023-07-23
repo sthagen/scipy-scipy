@@ -2257,6 +2257,11 @@ class f_gen(rv_continuous):
 
     Notes
     -----
+    The F distribution with :math:`df_1 > 0` and :math:`df_2 > 0` degrees of freedom is the
+    distribution of the ratio of two independent chi-squared distributions with
+    :math:`df_1` and :math:`df_2` degrees of freedom, after rescaling by
+    :math:`df_2 / df_1`.
+    
     The probability density function for `f` is:
 
     .. math::
@@ -2265,9 +2270,11 @@ class f_gen(rv_continuous):
                                 {(df_2+df_1 x)^{(df_1+df_2)/2}
                                  B(df_1/2, df_2/2)}
 
-    for :math:`x > 0` and parameters :math:`df_1, df_2 > 0` .
+    for :math:`x > 0`.
 
-    `f` takes ``dfn`` and ``dfd`` as shape parameters.
+    `f` accepts shape parameters ``dfn`` and ``dfd`` for :math:`df_1`, the degrees of
+    freedom of the chi-squared distribution in the numerator, and :math:`df_2`, the
+    degrees of freedom of the chi-squared distribution in the denominator, respectively.
 
     %(after_notes)s
 
@@ -6913,8 +6920,29 @@ class kappa3_gen(rv_continuous):
     def _cdf(self, x, a):
         return x*(a + x**a)**(-1.0/a)
 
+    def _sf(self, x, a):
+        x, a = np.broadcast_arrays(x, a)  # some code paths pass scalars
+        sf = super()._sf(x, a)
+
+        # When the SF is small, another formulation is typically more accurate.
+        # However, it blows up for large `a`, so use it only if it also returns
+        # a small value of the SF.
+        cutoff = 0.01
+        i = sf < cutoff
+        sf2 = -sc.expm1(sc.xlog1py(-1.0 / a[i], a[i] * x[i]**-a[i]))
+        i2 = sf2 > cutoff
+        sf2[i2] = sf[i][i2]  # replace bad values with original values
+
+        sf[i] = sf2
+        return sf
+
     def _ppf(self, q, a):
         return (a/(q**-a - 1.0))**(1.0/a)
+
+    def _isf(self, q, a):
+        lg = sc.xlog1py(-a, -q)
+        denom = sc.expm1(lg)
+        return (a / denom)**(1.0 / a)
 
     def _stats(self, a):
         outputs = [None if np.any(i < a) else np.nan for i in range(1, 5)]
