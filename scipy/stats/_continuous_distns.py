@@ -1467,7 +1467,8 @@ class chi_gen(rv_continuous):
         return np.sqrt(2*sc.gammainccinv(.5*df, q))
 
     def _stats(self, df):
-        mu = np.sqrt(2)*np.exp(sc.gammaln(df/2.0+0.5)-sc.gammaln(df/2.0))
+        # poch(df/2, 1/2) = gamma(df/2 + 1/2) / gamma(df/2)
+        mu = np.sqrt(2) * sc.poch(0.5 * df, 0.5)
         mu2 = df - mu*mu
         g1 = (2*mu**3.0 + mu*(1-2*df))/np.asarray(np.power(mu2, 1.5))
         g2 = 2*df*(1.0-df)-6*mu**4 + 4*mu**2 * (2*df-1)
@@ -3492,7 +3493,7 @@ class erlang_gen(gamma_gen):
             # shape parameter, so warn the user.
             message = ('The shape parameter of the erlang distribution '
                        f'has been given a non-integer value {a!r}.')
-            warnings.warn(message, RuntimeWarning)
+            warnings.warn(message, RuntimeWarning, stacklevel=3)
         return a > 0
 
     def _shape_info(self):
@@ -3836,7 +3837,7 @@ class genhyperbolic_gen(rv_continuous):
         if np.isnan(intgrl):
             msg = ("Infinite values encountered in scipy.special.kve. "
                    "Values replaced by NaN to avoid incorrect results.")
-            warnings.warn(msg, RuntimeWarning)
+            warnings.warn(msg, RuntimeWarning, stacklevel=3)
         return max(0.0, min(1.0, intgrl))
 
     def _cdf(self, x, p, a, b):
@@ -4875,7 +4876,7 @@ class geninvgauss_gen(rv_continuous):
         if np.isnan(z).any():
             msg = ("Infinite values encountered in scipy.special.kve(p, b). "
                    "Values replaced by NaN to avoid incorrect results.")
-            warnings.warn(msg, RuntimeWarning)
+            warnings.warn(msg, RuntimeWarning, stacklevel=3)
         return z
 
     def _pdf(self, x, p, b):
@@ -5126,7 +5127,7 @@ class geninvgauss_gen(rv_continuous):
             msg = ("Infinite values encountered in the moment calculation "
                    "involving scipy.special.kve. Values replaced by NaN to "
                    "avoid incorrect results.")
-            warnings.warn(msg, RuntimeWarning)
+            warnings.warn(msg, RuntimeWarning, stacklevel=3)
             m = np.full_like(num, np.nan, dtype=np.float64)
             m[~inf_vals] = num[~inf_vals] / denom[~inf_vals]
         else:
