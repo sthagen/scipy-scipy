@@ -81,9 +81,7 @@ inc_f2py = include_directories(incdir_f2py)
 fortranobject_c = incdir_f2py / 'fortranobject.c'
 
 npymath_path = _incdir_numpy_abs / '..' / 'lib'
-npyrandom_path = _incdir_numpy_abs / '..' / '..' / 'random' / 'lib'
 npymath_lib = cc.find_library('npymath', dirs: npymath_path)
-npyrandom_lib = cc.find_library('npyrandom', dirs: npyrandom_path)
 
 pybind11_dep = dependency('pybind11', version: '>=2.12.0')
 
@@ -130,6 +128,7 @@ fortranobject_lib = static_library('_fortranobject',
   c_args: numpy_nodepr_api,
   dependencies: py3_dep,
   include_directories: [inc_np, inc_f2py],
+  gnu_symbol_visibility: 'hidden',
 )
 fortranobject_dep = declare_dependency(
   link_with: fortranobject_lib,
