@@ -33,6 +33,7 @@ import scipy.sparse as sparse
 from scipy.sparse import (csc_matrix, csr_matrix, dok_matrix,
         coo_matrix, lil_matrix, dia_matrix, bsr_matrix,
         eye, issparse, SparseEfficiencyWarning, sparray)
+from scipy.sparse._base import _formats
 from scipy.sparse._sputils import (supported_dtypes, isscalarlike,
                                    get_index_dtype, asmatrix, matrix)
 from scipy.sparse.linalg import splu, expm, inv
@@ -644,10 +645,37 @@ class _TestCommon:
         assert_raises(ValueError, self.spcreator, (-1,-1))
 
     def test_repr(self):
-        repr(self.datsp)
+        datsp = self.spcreator([[1, 0, 0], [0, 0, 0], [0, 0, -2]])
+        extra = (
+            "(1 diagonals) " if datsp.format == "dia"
+            else "(blocksize=1x1) " if datsp.format == "bsr"
+            else ""
+        )
+        _, fmt = _formats[datsp.format]
+        expected = (
+            f"<{fmt} sparse matrix of dtype '{datsp.dtype}'\n"
+            f"\twith {datsp.nnz} stored elements {extra}and shape {datsp.shape}>"
+        )
+        assert repr(datsp) == expected
 
     def test_str(self):
-        str(self.datsp)
+        datsp = self.spcreator([[1, 0, 0], [0, 0, 0], [0, 0, -2]])
+        if datsp.nnz != 2:
+            return
+        extra = (
+            "(1 diagonals) " if datsp.format == "dia"
+            else "(blocksize=1x1) " if datsp.format == "bsr"
+            else ""
+        )
+        _, fmt = _formats[datsp.format]
+        expected = (
+            f"<{fmt} sparse matrix of dtype '{datsp.dtype}'\n"
+            f"\twith {datsp.nnz} stored elements {extra}and shape {datsp.shape}>"
+            "\n  Coords\tValues"
+            "\n  (0, 0)\t1"
+            "\n  (2, 2)\t-2"
+        )
+        assert str(datsp) == expected
 
     def test_empty_arithmetic(self):
         # Test manipulating empty matrices. Fails in SciPy SVN <= r1768
@@ -3801,6 +3829,10 @@ class TestCSR(sparse_test_class()):
         dense = array([[2**63 + 1, 0], [0, 1]], dtype=np.uint64)
         assert_array_equal(dense, csr.toarray())
 
+        # with duplicates (should sum the duplicates)
+        csr = csr_matrix(([1,1,1,1], ([0,2,2,0], [0,1,1,0])))
+        assert csr.nnz == 2
+
     def test_constructor5(self):
         # infer dimensions from arrays
         indptr = array([0,1,3,3])
@@ -4040,6 +4072,10 @@ class TestCSC(sparse_test_class()):
         ij = vstack((row,col))
         csc = csc_matrix((data,ij),(4,3))
         assert_array_equal(arange(12).reshape(4, 3), csc.toarray())
+
+        # with duplicates (should sum the duplicates)
+        csc = csc_matrix(([1,1,1,1], ([0,2,2,0], [0,1,1,0])))
+        assert csc.nnz == 2
 
     def test_constructor5(self):
         # infer dimensions from arrays
@@ -4454,6 +4490,13 @@ class TestCOO(sparse_test_class(getset=False,
         coo = coo_matrix(([1,1,1,1], ([0,2,2,0], [0,1,1,0])))
         dok = coo.todok()
         assert_array_equal(dok.toarray(), coo.toarray())
+
+    def test_tocompressed_duplicates(self):
+        coo = coo_matrix(([1,1,1,1], ([0,2,2,0], [0,1,1,0])))
+        csr = coo.tocsr()
+        assert_equal(csr.nnz + 2, coo.nnz)
+        csc = coo.tocsc()
+        assert_equal(csc.nnz + 2, coo.nnz)
 
     def test_eliminate_zeros(self):
         data = array([1, 0, 0, 0, 2, 0, 3, 0])
