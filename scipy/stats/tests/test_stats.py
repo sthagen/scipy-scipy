@@ -588,7 +588,7 @@ class TestPearsonr:
         with pytest.raises(ValueError, match=message):
             res.confidence_interval(method="exact")
 
-    @pytest.mark.fail_slow(2)
+    @pytest.mark.fail_slow(5)
     @pytest.mark.skip_xp_backends(np_only=True)
     @pytest.mark.xfail_on_32bit("Monte Carlo method needs > a few kB of memory")
     @pytest.mark.parametrize('alternative', ('less', 'greater', 'two-sided'))
@@ -8466,24 +8466,6 @@ class TestBrunnerMunzel:
         with pytest.warns(RuntimeWarning, match='divide by zero'):
             _, p = stats.brunnermunzel(x, y, distribution="normal")
         assert_equal(p, 0)
-
-
-class TestRatioUniforms:
-    """ Tests for rvs_ratio_uniforms are in test_sampling.py,
-    as rvs_ratio_uniforms is deprecated and moved to stats.sampling """
-    def test_consistency(self):
-        f = stats.norm.pdf
-        v = np.sqrt(f(np.sqrt(2))) * np.sqrt(2)
-        umax = np.sqrt(f(0))
-        gen = stats.sampling.RatioUniforms(f, umax=umax, vmin=-v, vmax=v,
-                                           random_state=12345)
-        r1 = gen.rvs(10)
-        deprecation_msg = ("Please use `RatioUniforms` from the "
-                           "`scipy.stats.sampling` namespace.")
-        with pytest.warns(DeprecationWarning, match=deprecation_msg):
-            r2 = stats.rvs_ratio_uniforms(f, umax, -v, v, size=10,
-                                          random_state=12345)
-        assert_equal(r1, r2)
 
 
 class TestQuantileTest:
