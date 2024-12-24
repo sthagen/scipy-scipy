@@ -2351,6 +2351,7 @@ class TestFactorialFunctions:
         assert_func(special.factorialk(n, 3, exact=exact),
                     np.array(exp_nucleus[3], ndmin=level))
 
+    @pytest.mark.fail_slow(5)
     @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.uint32, np.uint64])
     @pytest.mark.parametrize("exact,extend",
                              [(True, "zero"), (False, "zero"), (False, "complex")])
@@ -2364,10 +2365,38 @@ class TestFactorialFunctions:
             assert_func(special.factorial2(n, **kw), special.factorial2(n_ref, **kw))
             assert_func(special.factorialk(n, k=3, **kw),
                         special.factorialk(n_ref, k=3, **kw))
+        def _check_inf(n):
+            # produce inf of same type/dimension
+            with suppress_warnings() as sup:
+                sup.filter(RuntimeWarning)
+                shaped_inf = n / 0
+            assert_func(special.factorial(n, **kw), shaped_inf)
+            assert_func(special.factorial2(n, **kw), shaped_inf)
+            assert_func(special.factorialk(n, k=3, **kw), shaped_inf)
+
         _check(dtype(0))
         _check(dtype(1))
         _check(np.array(0, dtype=dtype))
         _check(np.array([0, 1], dtype=dtype))
+        # test that maximal uint values work as well
+        N = dtype(np.iinfo(dtype).max)
+        # TODO: cannot use N itself yet; factorial uses `gamma(N+1)` resp. `(hi+lo)//2`
+        if dtype == np.uint64:
+            if exact:
+                # avoid attempting huge calculation
+                pass
+            elif np.lib.NumpyVersion(np.__version__) >= "2.0.0":
+                # N does not fit into int64 --> cannot use _check
+                _check_inf(dtype(N-1))
+                _check_inf(np.array(N-1, dtype=dtype))
+                _check_inf(np.array([N-1], dtype=dtype))
+        elif dtype in [np.uint8, np.uint16] or not exact:
+            # factorial(65535, exact=True) has 287189 digits and is calculated almost
+            # instantaneously on modern hardware; however, dtypes bigger than uint16
+            # would blow up runtime and memory consumption for exact=True
+            _check(N-1)
+            _check(np.array(N-1, dtype=dtype))
+            _check(np.array([N-2, N-1], dtype=dtype))
 
     # note that n=170 is the last integer such that factorial(n) fits float64
     @pytest.mark.parametrize('n', range(30, 180, 10))
@@ -4129,6 +4158,8 @@ class TestRound:
         rndrl = (10,10,10,11)
         assert_array_equal(rnd,rndrl)
 
+# sph_harm is deprecated and is implemented as a shim around sph_harm_y.
+# The following two tests are maintained to verify the correctness of the shim.
 
 def test_sph_harm():
     # Tests derived from tables in
@@ -4139,35 +4170,39 @@ def test_sph_harm():
     sqrt = np.sqrt
     sin = np.sin
     cos = np.cos
-    assert_array_almost_equal(sh(0,0,0,0),
-           0.5/sqrt(pi))
-    assert_array_almost_equal(sh(-2,2,0.,pi/4),
-           0.25*sqrt(15./(2.*pi)) *
-           (sin(pi/4))**2.)
-    assert_array_almost_equal(sh(-2,2,0.,pi/2),
-           0.25*sqrt(15./(2.*pi)))
-    assert_array_almost_equal(sh(2,2,pi,pi/2),
-           0.25*sqrt(15/(2.*pi)) *
-           exp(0+2.*pi*1j)*sin(pi/2.)**2.)
-    assert_array_almost_equal(sh(2,4,pi/4.,pi/3.),
-           (3./8.)*sqrt(5./(2.*pi)) *
-           exp(0+2.*pi/4.*1j) *
-           sin(pi/3.)**2. *
-           (7.*cos(pi/3.)**2.-1))
-    assert_array_almost_equal(sh(4,4,pi/8.,pi/6.),
-           (3./16.)*sqrt(35./(2.*pi)) *
-           exp(0+4.*pi/8.*1j)*sin(pi/6.)**4.)
+    with suppress_warnings() as sup:
+        sup.filter(category=DeprecationWarning)
+        assert_array_almost_equal(sh(0,0,0,0),
+               0.5/sqrt(pi))
+        assert_array_almost_equal(sh(-2,2,0.,pi/4),
+               0.25*sqrt(15./(2.*pi)) *
+               (sin(pi/4))**2.)
+        assert_array_almost_equal(sh(-2,2,0.,pi/2),
+               0.25*sqrt(15./(2.*pi)))
+        assert_array_almost_equal(sh(2,2,pi,pi/2),
+               0.25*sqrt(15/(2.*pi)) *
+               exp(0+2.*pi*1j)*sin(pi/2.)**2.)
+        assert_array_almost_equal(sh(2,4,pi/4.,pi/3.),
+               (3./8.)*sqrt(5./(2.*pi)) *
+               exp(0+2.*pi/4.*1j) *
+               sin(pi/3.)**2. *
+               (7.*cos(pi/3.)**2.-1))
+        assert_array_almost_equal(sh(4,4,pi/8.,pi/6.),
+               (3./16.)*sqrt(35./(2.*pi)) *
+               exp(0+4.*pi/8.*1j)*sin(pi/6.)**4.)
 
 
 def test_sph_harm_ufunc_loop_selection():
     # see https://github.com/scipy/scipy/issues/4895
     dt = np.dtype(np.complex128)
-    assert_equal(special.sph_harm(0, 0, 0, 0).dtype, dt)
-    assert_equal(special.sph_harm([0], 0, 0, 0).dtype, dt)
-    assert_equal(special.sph_harm(0, [0], 0, 0).dtype, dt)
-    assert_equal(special.sph_harm(0, 0, [0], 0).dtype, dt)
-    assert_equal(special.sph_harm(0, 0, 0, [0]).dtype, dt)
-    assert_equal(special.sph_harm([0], [0], [0], [0]).dtype, dt)
+    with suppress_warnings() as sup:
+        sup.filter(category=DeprecationWarning)
+        assert_equal(special.sph_harm(0, 0, 0, 0).dtype, dt)
+        assert_equal(special.sph_harm([0], 0, 0, 0).dtype, dt)
+        assert_equal(special.sph_harm(0, [0], 0, 0).dtype, dt)
+        assert_equal(special.sph_harm(0, 0, [0], 0).dtype, dt)
+        assert_equal(special.sph_harm(0, 0, 0, [0]).dtype, dt)
+        assert_equal(special.sph_harm([0], [0], [0], [0]).dtype, dt)
 
 
 class TestStruve:
@@ -4667,3 +4702,8 @@ class TestLegendreDeprecation:
         message = f"`scipy.special.{xlpmn.__name__}` is deprecated..."
         with pytest.deprecated_call(match=message):
             _ = xlpmn(1, 1, 0)
+
+    def test_warn_sph_harm(self):
+        msg = "`scipy.special.sph_harm` is deprecated..."
+        with pytest.deprecated_call(match=msg):
+            _ = special.sph_harm(1, 1, 0, 0)
