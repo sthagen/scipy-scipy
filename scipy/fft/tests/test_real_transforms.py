@@ -52,7 +52,7 @@ def test_identity_1d(forward, backward, type, n, axis, norm, orthogonalize, xp):
 @pytest.mark.parametrize("norm", [None, 'backward', 'ortho', 'forward'])
 @pytest.mark.parametrize("overwrite_x", [True, False])
 def test_identity_1d_overwrite(forward, backward, type, dtype, axis, norm,
-                               overwrite_x):
+                               overwrite_x, xp):
     # Test the identity f^-1(f(x)) == x
     x = np.random.rand(7, 8).astype(dtype)
     x_orig = x.copy()
@@ -130,7 +130,7 @@ def test_identity_nd(forward, backward, type, shape, axes, norm,
 @pytest.mark.parametrize("norm", [None, 'backward', 'ortho', 'forward'])
 @pytest.mark.parametrize("overwrite_x", [False, True])
 def test_identity_nd_overwrite(forward, backward, type, shape, axes, dtype,
-                               norm, overwrite_x):
+                               norm, overwrite_x, xp):
     # Test the identity f^-1(f(x)) == x
 
     x = np.random.random(shape).astype(dtype)
@@ -193,8 +193,8 @@ def test_orthogonalize_noop(func, type, norm, xp):
 
 
 @skip_xp_backends('jax.numpy',
-                  reason='jax arrays do not support item assignment',
-                  cpu_only=True)
+                  reason='jax arrays do not support item assignment')
+@skip_xp_backends(cpu_only=True)
 @pytest.mark.parametrize("norm", ["backward", "ortho", "forward"])
 def test_orthogonalize_dct1(norm, xp):
     x = xp.asarray(np.random.rand(100))
@@ -212,8 +212,8 @@ def test_orthogonalize_dct1(norm, xp):
 
 
 @skip_xp_backends('jax.numpy',
-                  reason='jax arrays do not support item assignment',
-                  cpu_only=True)
+                  reason='jax arrays do not support item assignment')
+@skip_xp_backends(cpu_only=True)
 @pytest.mark.parametrize("norm", ["backward", "ortho", "forward"])
 @pytest.mark.parametrize("func", [dct, dst])
 def test_orthogonalize_dcst2(func, norm, xp):
@@ -226,8 +226,8 @@ def test_orthogonalize_dcst2(func, norm, xp):
 
 
 @skip_xp_backends('jax.numpy',
-                  reason='jax arrays do not support item assignment',
-                  cpu_only=True)
+                  reason='jax arrays do not support item assignment')
+@skip_xp_backends(cpu_only=True)
 @pytest.mark.parametrize("norm", ["backward", "ortho", "forward"])
 @pytest.mark.parametrize("func", [dct, dst])
 def test_orthogonalize_dcst3(func, norm, xp):
