@@ -136,6 +136,7 @@ from . import _hierarchy, _optimal_leaf_ordering
 import scipy.spatial.distance as distance
 from scipy._lib._array_api import array_namespace, _asarray, xp_copy, is_jax
 from scipy._lib._disjoint_set import DisjointSet
+import scipy._lib.array_api_extra as xpx
 
 
 _LINKAGE_METHODS = {'single': 0, 'complete': 1, 'average': 2, 'centroid': 3,
@@ -2251,10 +2252,12 @@ def is_valid_linkage(Z, warning=False, throw=False, name=None):
             if xp.any(Z[:, 3] > (Z.shape[0] + 1)):
                 raise ValueError('Linkage matrix contains excessive observations'
                                  'in a cluster')
-        if _check_hierarchy_uses_cluster_before_formed(Z):
+        if xp.any(
+            xp.max(Z[:, :2], axis=1) >= xp.arange(n + 1, 2 * n + 1, dtype=Z.dtype)
+        ):
             raise ValueError(f'Linkage {name_str}uses non-singleton cluster before'
                              ' it is formed.')
-        if _check_hierarchy_uses_cluster_more_than_once(Z):
+        if xpx.nunique(Z[:, :2]) < n * 2:
             raise ValueError(f'Linkage {name_str}uses the same cluster more than once.')
     except Exception as e:
         if throw:
@@ -2264,40 +2267,6 @@ def is_valid_linkage(Z, warning=False, throw=False, name=None):
         valid = False
 
     return valid
-
-
-def _check_hierarchy_uses_cluster_before_formed(Z):
-    n = Z.shape[0] + 1
-    for i in range(0, n - 1):
-        if Z[i, 0] >= n + i or Z[i, 1] >= n + i:
-            return True
-    return False
-
-
-def _check_hierarchy_uses_cluster_more_than_once(Z):
-    n = Z.shape[0] + 1
-    chosen = set()
-    for i in range(0, n - 1):
-        used_more_than_once = (
-            (float(Z[i, 0]) in chosen)
-            or (float(Z[i, 1]) in chosen)
-            or Z[i, 0] == Z[i, 1]
-        )
-        if used_more_than_once:
-            return True
-        chosen.add(float(Z[i, 0]))
-        chosen.add(float(Z[i, 1]))
-    return False
-
-
-def _check_hierarchy_not_all_clusters_used(Z):
-    n = Z.shape[0] + 1
-    chosen = set()
-    for i in range(0, n - 1):
-        chosen.add(int(Z[i, 0]))
-        chosen.add(int(Z[i, 1]))
-    must_chosen = set(range(0, 2 * n - 2))
-    return len(must_chosen.difference(chosen)) > 0
 
 
 def num_obs_linkage(Z):
@@ -4164,7 +4133,7 @@ def leaders(Z, T):
     if T.shape[0] != Z.shape[0] + 1:
         raise ValueError('Mismatch: len(T)!=Z.shape[0] + 1.')
 
-    n_clusters = int(xp.unique_values(T).shape[0])
+    n_clusters = int(xpx.nunique(T))
     n_obs = int(Z.shape[0] + 1)
     L = np.zeros(n_clusters, dtype=np.int32)
     M = np.zeros(n_clusters, dtype=np.int32)
