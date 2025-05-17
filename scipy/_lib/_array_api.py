@@ -687,7 +687,7 @@ def _make_sphinx_capabilities(
     # xpx.lazy_xp_backends kwargs
     allow_dask_compute=False, jax_jit=True,
     # unused in documentation
-    reason=None, static_argnums=None, static_argnames=None,
+    reason=None,
 ):
     exceptions = set(exceptions)
 
@@ -761,7 +761,6 @@ def xp_capabilities(
     # xpx.testing.lazy_xp_function kwargs.
     # Refer to array-api-extra documentation.
     allow_dask_compute=False, jax_jit=True,
-    static_argnums=None, static_argnames=None,
 ):
     """Decorator for a function that states its support among various
     Array API compatible backends.
@@ -792,23 +791,25 @@ def xp_capabilities(
         exceptions=exceptions,
         allow_dask_compute=allow_dask_compute,
         jax_jit=jax_jit,
-        static_argnums=static_argnums,
-        static_argnames=static_argnames,
     )
     sphinx_capabilities = _make_sphinx_capabilities(**capabilities)
 
     def decorator(f):
-        @functools.wraps(f)
-        def wrapper(*args, **kwargs):
-            return f(*args, **kwargs)
-
-        capabilities_table[wrapper] = capabilities
+        # Don't use a wrapper, as in some cases @xp_capabilities is
+        # applied to a ufunc
+        capabilities_table[f] = capabilities
         note = _make_capabilities_note(f.__name__, sphinx_capabilities)
-        doc = FunctionDoc(wrapper)
+        doc = FunctionDoc(f)
         doc['Notes'].append(note)
-        wrapper.__doc__ = str(doc).split("\n", 1)[1]  # remove signature
+        doc = str(doc).split("\n", 1)[1]  # remove signature
+        try:
+            f.__doc__ = doc
+        except AttributeError:
+            # Can't update __doc__ on ufuncs if SciPy
+            # was compiled against NumPy < 2.2.
+            pass
 
-        return wrapper
+        return f
     return decorator
 
 
@@ -837,8 +838,7 @@ def _make_xp_pytest_marks(*funcs, capabilities_table=None):
             marks.append(pytest.mark.xfail_xp_backends(mod_name, reason=reason))
 
         lazy_kwargs = {k: capabilities[k]
-                       for k in ('allow_dask_compute', 'jax_jit',
-                                 'static_argnums', 'static_argnames')}
+                       for k in ('allow_dask_compute', 'jax_jit')}
         lazy_xp_function(func, **lazy_kwargs)
 
     return marks
@@ -868,7 +868,7 @@ def make_xp_test_case(*funcs, capabilities_table=None):
     return lambda func: functools.reduce(lambda f, g: g(f), marks, func)
 
 
-def make_xp_pytest_param(func, capabilities_table=None):
+def make_xp_pytest_param(func, *args, capabilities_table=None):
     """Variant of ``make_xp_test_case`` that returns a pytest.param for a function,
     with all necessary skip_xp_backends and xfail_xp_backends marks applied::
     
@@ -892,6 +892,20 @@ def make_xp_pytest_param(func, capabilities_table=None):
         def test(func, xp):
             ...
 
+    Parameters
+    ----------
+    func : Callable
+        Function to be tested. It must be decorated with ``@xp_capabilities``.
+    *args : Any, optional
+        Extra pytest parameters for the use case, e.g.::
+
+        @pytest.mark.parametrize("func,verb", [
+            make_xp_pytest_param(f1, "hello"),
+            make_xp_pytest_param(f2, "world")])
+        def test(func, verb, xp):
+            # iterates on (func=f1, verb="hello")
+            # and (func=f2, verb="world")
+
     See Also
     --------
     xp_capabilities
@@ -901,7 +915,7 @@ def make_xp_pytest_param(func, capabilities_table=None):
     import pytest
 
     marks = _make_xp_pytest_marks(func, capabilities_table=capabilities_table)
-    return pytest.param(func, marks=marks)
+    return pytest.param(func, *args, marks=marks, id=func.__name__)
 
 
 # Is it OK to have a dictionary that is mutated (once upon import) in many places?
