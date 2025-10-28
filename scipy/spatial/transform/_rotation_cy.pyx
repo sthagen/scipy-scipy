@@ -957,24 +957,43 @@ def approx_equal(double[:, :] quat, double[:, :] other, atol = None, bint degree
 
 @cython.embedsignature(True)
 @cython.boundscheck(False)
-def mean(double[:, :] quat, weights=None):
+def mean(double[:, :] quat, weights=None, axis=None):
     if quat.shape[0] == 0:
         raise ValueError("Mean of an empty rotation set is undefined.")
+    # The Cython path assumes quat is Nx4, so axis has to be None, 0, -1, (0,), (-1,),
+    # or (). The code path is unchanged for any of the options except (), where we
+    # immediately return the quaternion
+    if axis == ():
+        return quat
+
+    if axis is None:
+        axis = (0,)
+    if isinstance(axis, int):
+        axis = (axis,)
+    if not isinstance(axis, tuple):  # Must be tuple by now
+        raise ValueError("`axis` must be None, int, or tuple of ints.")
+    if min(axis) < -1 or max(axis) > 0:
+        raise ValueError(
+            f"axis {axis} is out of bounds for rotation with shape "
+            f"{np.asarray(quat).shape[:-1]}."
+        )
+    # Axis must be 0 for the cython backend. Everything else should have raised an
+    # error during validation.
+    axis = (0,)
 
     if weights is None:
         weights = np.ones(quat.shape[0])
     else:
         weights = np.asarray(weights)
-        if weights.ndim != 1:
-            raise ValueError("Expected `weights` to be 1 dimensional, got "
-                                "shape {}.".format(weights.shape))
-        if weights.shape[0] != quat.shape[0]:
-            raise ValueError("Expected `weights` to have number of values "
-                                "equal to number of rotations, got "
-                                "{} values and {} rotations.".format(
-                                weights.shape[0], quat.shape[0]))
         if np.any(weights < 0):
             raise ValueError("`weights` must be non-negative.")
+        if weights.ndim != 1:
+            raise ValueError(f"Expected `weights` to be 1 dimensional, got "
+                             f"{weights.shape}.")
+        if weights.shape[0] != quat.shape[0]:
+            raise ValueError("Expected `weights` to have number of values equal to "
+                             f"number of rotations, got {weights.shape[0]} values and "
+                             f"{quat.shape[0]} rotations.")
 
     quat = np.asarray(quat)
     K = np.dot(weights * quat.T, quat)
