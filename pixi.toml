@@ -275,9 +275,7 @@ platforms = ["linux-64", "osx-arm64", "win-64"]
 ruff = "*"
 cython-lint = "*"
 packaging = "*"
-
-[feature.lint.pypi-dependencies]
-dtach = "*"
+tach = "*"
 
 [feature.lint.tasks.lint]
 cmd = "spin lint"
@@ -302,12 +300,6 @@ description = "Check external dependencies"
 [feature.mkl.target.linux-64.dependencies]
 libblas = { version = "*", build = "*mkl" }
 mkl = "*"
-
-[feature.mkl.tasks.build-mkl]
-cmd = "spin build --build-dir=build-mkl --setup-args=-Dblas=mkl-dynamic-ilp64-seq --setup-args=-Duse-g77-abi=true"
-cwd = "scipy"
-env = { CC = "ccache $CC", CXX = "ccache $CXX", FC = "ccache $FC" }
-description = "Build with MKL BLAS"
 
 
 [feature.accelerate]
