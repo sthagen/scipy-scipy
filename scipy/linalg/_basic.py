@@ -208,7 +208,7 @@ def solve(a, b, lower=False, overwrite_a=False,
            [ 3. , -2.5],
            [ 5. , -4.5]])
     """
-    if assume_a in ['tridiagonal', 'banded']:
+    if assume_a in ['banded']:
         # TODO: handle these structures in this function
         return solve0(
             a, b, lower=lower, overwrite_a=overwrite_a, overwrite_b=overwrite_b,
@@ -220,6 +220,7 @@ def solve(a, b, lower=False, overwrite_a=False,
         None: -1,
         'general': 0, 'gen': 0,
         'diagonal': 11,
+        'tridiagonal': 31,
         'upper triangular': 21,
         'lower triangular': 22,
         'pos' : 101, 'positive definite': 101,
@@ -1336,7 +1337,7 @@ def solve_circulant(c, b, singular='raise', tol=None,
 
 
 # matrix inversion
-def inv(a, overwrite_a=False, check_finite=True, assume_a=None, lower=False):
+def inv(a, overwrite_a=False, check_finite=True, *, assume_a=None, lower=False):
     r"""
     Compute the inverse of a matrix.
 
@@ -1856,7 +1857,7 @@ def pinv(a, *, atol=None, rtol=None, return_rank=False, check_finite=True):
     ----------
     .. [1] Penrose, R. (1956). On best approximate solutions of linear matrix
            equations. Mathematical Proceedings of the Cambridge Philosophical
-           Society, 52(1), 17-19. doi:10.1017/S0305004100030929
+           Society, 52(1), 17-19. :doi:`10.1017/S0305004100030929`.
 
     Examples
     --------
