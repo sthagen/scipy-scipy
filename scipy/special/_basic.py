@@ -2454,8 +2454,11 @@ def keip_zeros(nt):
 def kelvin_zeros(nt):
     """Compute nt zeros of all Kelvin functions.
 
-    Returned in a length-8 tuple of arrays of length nt.  The tuple contains
-    the arrays of zeros of (ber, bei, ker, kei, ber', bei', ker', kei').
+    Returns
+    -------
+    zeros : tuple of arrays
+        Length-8 tuple of arrays of length nt.  The tuple contains the arrays of zeros
+        of (ber, bei, ker, kei, ber', bei', ker', kei').
 
     References
     ----------
@@ -2483,6 +2486,11 @@ def pro_cv_seq(m, n, c):
     spheroidal wave functions for mode m and n'=m..n and spheroidal
     parameter c.
 
+    Returns
+    -------
+    cv : array of floats
+        Characteristic values.
+
     References
     ----------
     .. [1] Zhang, Shanjie and Jin, Jianming. "Computation of Special
@@ -2506,6 +2514,11 @@ def obl_cv_seq(m, n, c):
     Compute a sequence of characteristic values for the oblate
     spheroidal wave functions for mode m and n'=m..n and spheroidal
     parameter c.
+
+    Returns
+    -------
+    cv : array of floats
+        Characteristic values.
 
     References
     ----------
@@ -3039,7 +3052,8 @@ def factorial(n, exact=False, extend="zero"):
 
 
 def factorial2(n, exact=False, extend="zero"):
-    """Double factorial.
+    """
+    Double factorial.
 
     This is the factorial with every second value skipped.  E.g., ``7!! = 7 * 5
     * 3 * 1``.  It can be approximated numerically as::
@@ -3078,6 +3092,11 @@ def factorial2(n, exact=False, extend="zero"):
         Double factorial of ``n``, as integer, float or complex (depending on
         ``exact`` and ``extend``). Array inputs are returned as arrays.
 
+    References
+    ----------
+    .. [1] Complex extension to double factorial
+            https://en.wikipedia.org/wiki/Double_factorial#Complex_arguments
+
     Examples
     --------
     >>> from scipy.special import factorial2
@@ -3085,17 +3104,13 @@ def factorial2(n, exact=False, extend="zero"):
     np.float64(105.00000000000001)
     >>> factorial2(7, exact=True)
     105
-
-    References
-    ----------
-    .. [1] Complex extension to double factorial
-            https://en.wikipedia.org/wiki/Double_factorial#Complex_arguments
     """
     return _factorialx_wrapper("factorial2", n, k=2, exact=exact, extend=extend)
 
 
 def factorialk(n, k, exact=False, extend="zero"):
-    """Multifactorial of n of order k, n(!!...!).
+    """
+    Multifactorial of n of order k, n(!!...!).
 
     This is the multifactorial of n skipping k values.  For example,
 
@@ -3137,18 +3152,6 @@ def factorialk(n, k, exact=False, extend="zero"):
         Multifactorial (order ``k``) of ``n``, as integer, float or complex (depending
         on ``exact`` and ``extend``). Array inputs are returned as arrays.
 
-    Examples
-    --------
-    >>> from scipy.special import factorialk
-    >>> factorialk(5, k=1, exact=True)
-    120
-    >>> factorialk(5, k=3, exact=True)
-    10
-    >>> factorialk([5, 7, 9], k=3, exact=True)
-    array([ 10,  28, 162])
-    >>> factorialk([5, 7, 9], k=3, exact=False)
-    array([ 10.,  28., 162.])
-
     Notes
     -----
     While less straight-forward than for the double-factorial, it's possible to
@@ -3174,6 +3177,18 @@ def factorialk(n, k, exact=False, extend="zero"):
     ----------
     .. [1] Complex extension to multifactorial
             https://en.wikipedia.org/wiki/Double_factorial#Alternative_extension_of_the_multifactorial
+
+    Examples
+    --------
+    >>> from scipy.special import factorialk
+    >>> factorialk(5, k=1, exact=True)
+    120
+    >>> factorialk(5, k=3, exact=True)
+    10
+    >>> factorialk([5, 7, 9], k=3, exact=True)
+    array([ 10,  28, 162])
+    >>> factorialk([5, 7, 9], k=3, exact=False)
+    array([ 10.,  28., 162.])
     """
     return _factorialx_wrapper("factorialk", n, k=k, exact=exact, extend=extend)
 

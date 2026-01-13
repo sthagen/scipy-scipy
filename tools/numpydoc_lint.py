@@ -8,15 +8,12 @@ from scipy._lib._public_api import PUBLIC_MODULES
 
 
 skip_errors = [
-    "GL01",
-    "GL02",
-    "GL03",
-    "GL05",
-    "GL07",
+    "GL01",  # inconsistent standards; see gh-24348
+    "GL02",  # inconsistent standards; see gh-24348
+    "GL03",  # overlaps with GL02; see gh-24348
     "GL09",
-    "SS02",
     "SS03",
-    "SS05",
+    "SS05",  # inconsistent standards; see gh-24348
     "SS06",
     "ES01",
     "PR01",
@@ -27,18 +24,20 @@ skip_errors = [
     "PR07",
     "PR08",
     "PR09",
-    "PR10",
-    "RT01",
-    "RT02",
+    "RT02",  # questionable rule; see gh-24348
     "RT03",
     "RT04",
     "RT05",
-    "YD01",
-    "SA01",
+    "SA01",  # questionable rule; see gh-24348
     "SA02",
     "SA03",
     "SA04",
     "EX01",  # remove when gh-7168 is resolved
+]
+
+
+skip_items = [
+    "scipy.spatial.cKDTree"  # numpydoc ignore comment removed during compilation?
 ]
 
 
@@ -61,6 +60,8 @@ def main():
 
     errors = 0
     for item in to_check:
+        if str(item) in skip_items:
+            continue
         try:
             res = validate(item)
         except AttributeError:
