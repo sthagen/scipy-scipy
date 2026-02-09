@@ -1075,20 +1075,20 @@ class _TestCommon:
         for dtype in self.checked_dtypes:
             check(dtype)
 
-    def test_sum_dtype_fractional(self):
+    def test_sum_dtype_pair_of_dtypes(self):
         # Test sum with dtype on data of various input dtypes 
         # to ensure elements are cast before summing
-        # Only test conversions that don't raise numpy warnings/errors
         base_dat = array([[0.6, 0.7],
                           [0.8, 0.9]])
 
         for input_dtype in self.checked_dtypes:
             dat = base_dat.astype(input_dtype)
             datsp = self.spcreator(dat)
-            # Ensure duplicates are summed for non-canonical test cases
-            if hasattr(datsp, 'sum_duplicates'):
-                datsp.sum_duplicates()
 
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
+                if isinstance(datsp, spmatrix):
+                    dat = np.matrix(dat)
 
             for output_dtype in self.checked_dtypes:
                 # Skip problematic dtype combinations (complex to real, etc.)
@@ -1104,20 +1104,37 @@ class _TestCommon:
                 with np.errstate(over='ignore'):
                     dat_sum = dat.sum(dtype=output_dtype)
                     datsp_sum = datsp.sum(dtype=output_dtype)
-                    assert_array_almost_equal(dat_sum, np.asarray(datsp_sum))
-                    assert_equal(np.asarray(dat_sum).dtype, np.asarray(datsp_sum).dtype)
+                    assert_allclose(datsp_sum, dat_sum)
+                    assert_equal(datsp_sum.dtype, dat_sum.dtype)
 
                     # Check axis=0
                     dat_sum = dat.sum(axis=0, dtype=output_dtype)
                     datsp_sum = datsp.sum(axis=0, dtype=output_dtype)
-                    assert_array_almost_equal(dat_sum, np.asarray(datsp_sum).ravel())
-                    assert_equal(np.asarray(dat_sum).dtype, np.asarray(datsp_sum).dtype)
+                    assert_allclose(datsp_sum, dat_sum)
+                    assert_equal(datsp_sum.dtype, dat_sum.dtype)
 
                     # Check axis=1
                     dat_sum = dat.sum(axis=1, dtype=output_dtype)
                     datsp_sum = datsp.sum(axis=1, dtype=output_dtype)
-                    assert_array_almost_equal(dat_sum, np.asarray(datsp_sum).ravel())
-                    assert_equal(np.asarray(dat_sum).dtype, np.asarray(datsp_sum).dtype)
+                    assert_allclose(datsp_sum, dat_sum)
+                    assert_equal(datsp_sum.dtype, dat_sum.dtype)
+
+    def test_sum_dtype_fractional_to_int(self):
+        # Test sum with dtype=int on data of float input dtype
+        # to ensure elements are cast before summing
+        datsp = self.spcreator([[0.6, 0.7],
+                          [0.8, 0.9]])
+        
+        correct_res = array([0, 0])
+        t_correct_res = np.transpose(correct_res)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
+            if isinstance(datsp, spmatrix):
+                correct_res = np.matrix(correct_res)
+            
+        assert_equal(datsp.sum(dtype=int), 0) # Check axis=None
+        assert_equal(datsp.sum(axis=0, dtype=int), correct_res) # Check axis=0
+        assert_equal(datsp.sum(axis=1, dtype=int), t_correct_res) # Check axis=1
 
     def test_sum_out(self):
         keep = not self.is_array_test
