@@ -497,7 +497,7 @@ class _cs_matrix(_data_matrix, _minmax_mixin, IndexMixin):
         # so we only do the case axis= minor axis
         if (self.ndim == 2 and not hasattr(self, 'blocksize') and
                 axis in self._swap(((1, -1), (0, -2)))[0]):
-            # faster than multiplication for large major axis in CSC/CSR
+            # faster than multiplication for large minor axis in CSC/CSR
             
             if dtype is not None:
                 self_to_reduce = self.astype(dtype, copy=False)
