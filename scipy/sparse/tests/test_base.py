@@ -1125,12 +1125,8 @@ class _TestCommon:
         datsp = self.spcreator([[0.6, 0.7],
                           [0.8, 0.9]])
         
-        correct_res = array([0, 0])
-        t_correct_res = np.transpose(correct_res)
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
-            if isinstance(datsp, spmatrix):
-                correct_res = np.matrix(correct_res)
+        correct_res = array([0, 0] if self.is_array_test else [[0, 0]])
+        t_correct_res = array([0, 0] if self.is_array_test else [[0], [0]])
             
         assert_equal(datsp.sum(dtype=int), 0) # Check axis=None
         assert_equal(datsp.sum(axis=0, dtype=int), correct_res) # Check axis=0
