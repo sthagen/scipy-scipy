@@ -1087,7 +1087,7 @@ class _TestCommon:
 
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
-                if isinstance(datsp, spmatrix):
+                if not self.is_array_test:
                     dat = np.matrix(dat)
 
             for output_dtype in self.checked_dtypes:
