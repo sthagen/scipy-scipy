@@ -499,12 +499,8 @@ class _cs_matrix(_data_matrix, _minmax_mixin, IndexMixin):
                 axis in self._swap(((1, -1), (0, -2)))[0]):
             # faster than multiplication for large minor axis in CSC/CSR
             
-            if dtype is not None:
-                self_to_reduce = self.astype(dtype, copy=False)
-                res_dtype = dtype
-            else:
-                self_to_reduce = self
-                res_dtype = get_sum_dtype(self.dtype)
+            res_dtype = get_sum_dtype(self.dtype) if dtype is None else dtype
+            self_to_reduce = self.astype(res_dtype, copy=False)
             
             # Fast path: reduce along minor axis
             ret = np.zeros(len(self_to_reduce.indptr) - 1, dtype=res_dtype)
@@ -514,10 +510,7 @@ class _cs_matrix(_data_matrix, _minmax_mixin, IndexMixin):
             if axis % 2 == 1:
                 ret = ret.T
 
-            if out is not None:
-                out[...] = ret
-                return out
-            return ret
+            return ret.sum(axis=(), dtype=res_dtype, out=out)
         else:
             return _spbase.sum(self, axis=axis, dtype=dtype, out=out)
 
