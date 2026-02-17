@@ -73,17 +73,10 @@ _NO_CACHE = "no_cache"
 #  compare old/new distribution timing
 #  make video
 #  add array API support
-#  why does dist.ilogcdf(-100) not converge to bound? Check solver response to inf
-#  _chandrupatla_minimize should not report xm = fm = NaN when it fails
-#  integrate `logmoment` into `moment`? (Not hard, but enough time and code
-#   complexity to wait for reviewer feedback before adding.)
-#  Eliminate bracket_root error "`min <= a < b <= max` must be True"
-#  Test repr?
 #  use `median` information to improve integration? In some cases this will
 #   speed things up. If it's not needed, it may be about twice as slow. I think
-#   it should depend on the accuracy setting.
+#   it should depend on the accuracy setting (and whether median formula is available).
 #  in tests, check reference value against that produced using np.vectorize?
-#  add `axis` to `ks_1samp`
 #  User tips for faster execution:
 #  - pass NumPy arrays
 #  - pass inputs of floating point type (not integers)
@@ -99,46 +92,9 @@ _NO_CACHE = "no_cache"
 #  Reconsider `all_inclusive`
 #  Should process_parameters update kwargs rather than returning? Should we
 #   update parameters rather than setting to what process_parameters returns?
-
-# Questions:
-# 1.  I override `__getattr__` so that distribution parameters can be read as
-#     attributes. We don't want uses to try to change them.
-#     - To prevent replacements (dist.a = b), I could override `__setattr__`.
-#     - To prevent in-place modifications, `__getattr__` could return a copy,
-#       or it could set the WRITEABLE flag of the array to false.
-#     Which should I do?
-# 2.  `cache_policy` is supported in several methods where I imagine it being
-#     useful, but it needs to be tested. Before doing that:
-#     - What should the default value be?
-#     - What should the other values be?
-#     Or should we just eliminate this policy?
-# 3.  `validation_policy` is supported in a few places, but it should be checked for
-#     consistency. I have the same questions as for `cache_policy`.
-# 4.  `tol` is currently notional. I think there needs to be way to set
-#     separate `atol` and `rtol`. Some ways I imagine it being used:
-#     - Values can be passed to iterative functions (quadrature, root-finder).
-#     - To control which "method" of a distribution function is used. For
-#       example, if `atol` is set to `1e-12`, it may be acceptable to compute
-#       the complementary CDF as 1 - CDF even when CDF is nearly 1; otherwise,
-#       a (potentially more time-consuming) method would need to be used.
-#     I'm looking for unified suggestions for the interface, not ad hoc ideas
-#     for using tolerances. Suppose the user wants to have more control over
-#     the tolerances used for each method - how do they specify it? It would
-#     probably be easiest for the user if they could pass tolerances into each
-#     method, but it's easiest for us if they can only set it as a property of
-#     the class. Perhaps a dictionary of tolerance settings?
-# 5.  I also envision that accuracy estimates should be reported to the user
-#     somehow. I think my preference would be to return a subclass of an array
-#     with an `error` attribute - yes, really. But this is unlikely to be
-#     popular, so what are other ideas? Again, we need a unified vision here,
-#     not just pointing out difficulties (not all errors are known or easy
-#     to estimate, what to do when errors could compound, etc.).
-# 6.  The term "method" is used to refer to public instance functions,
-#     private instance functions, the "method" string argument, and the means
-#     of calculating the desired quantity (represented by the string argument).
-#     For the sake of disambiguation, shall I rename the "method" string to
-#     "strategy" and refer to the means of calculating the quantity as the
-#     "strategy"?
+# `validation_policy` needs testing
+# `tol` does not offer very fine-grained control; consider improving
+# report accuracy estimates?
 
 # Originally, I planned to filter out invalid distribution parameters;
 # distribution implementation functions would always work with "compressed",
@@ -1830,7 +1786,6 @@ class UnivariateDistribution(_ProbabilityDistribution):
 
     ### Attributes
 
-    # `tol` attribute is just notional right now. See Question 4 above.
     @property
     def tol(self):
         r"""positive float:
@@ -2102,8 +2057,7 @@ class UnivariateDistribution(_ProbabilityDistribution):
         args = np.broadcast_arrays(*args)
         # If we know the median or mean, consider breaking up the interval
         rtol = None if _isnull(self.tol) else self.tol
-        # For now, we ignore the status, but I want to return the error
-        # estimate - see question 5 at the top.
+        # For now, we ignore the status, but I want to return the error estimate
         if isinstance(self, ContinuousDistribution):
             res = _tanhsinh(f, a, b, args=args, log=log, rtol=rtol)
             return res.integral
@@ -2114,7 +2068,7 @@ class UnivariateDistribution(_ProbabilityDistribution):
             # case this.
             cond = np.isnan(params.popitem()[1]) if params else np.True_
             cond = np.broadcast_to(cond, a.shape)
-            res[(a > b)] = -np.inf if log else 0  # fix in nsum?
+            res[(a > b)] = -np.inf if log else 0  # fix in nsum? See gh-22321
             res[cond] = np.nan
 
             return res[()]
@@ -2151,7 +2105,7 @@ class UnivariateDistribution(_ProbabilityDistribution):
 
         res = _bracket_root(f3, xl0=xl0, xr0=xr0, xmin=xmin, xmax=xmax, args=args)
         # For now, we ignore the status, but I want to use the bracket width
-        # as an error estimate - see question 5 at the top.
+        # as an error estimate.
 
         xrtol = None if _isnull(self.tol) else self.tol
         xatol = None if xatol is None else xatol
@@ -2538,8 +2492,6 @@ class UnivariateDistribution(_ProbabilityDistribution):
 
     @_dispatch
     def _logcdf2_dispatch(self, x, y, *, method=None, **params):
-        # dtype is complex if any x > y, else real
-        # Should revisit this logic.
         if self._overrides('_logcdf2_formula'):
             method = self._logcdf2_formula
         elif (self._overrides('_logcdf_formula')
@@ -2644,7 +2596,6 @@ class UnivariateDistribution(_ProbabilityDistribution):
 
     @_dispatch
     def _cdf2_dispatch(self, x, y, *, method=None, **params):
-        # Should revisit this logic.
         if self._overrides('_cdf2_formula'):
             method = self._cdf2_formula
         elif (self._overrides('_logcdf_formula')
@@ -3361,36 +3312,6 @@ class UnivariateDistribution(_ProbabilityDistribution):
         with np.errstate(invalid='ignore'):  # can happen with infinite moment
             moment_b = np.sum(n_choose_i*moment_as*(a-b)**(n-i), axis=0)
         return moment_b
-
-    def _logmoment(self, order=1, *, logcenter=None, standardized=False):
-        # make this private until it is worked into moment
-        if logcenter is None or standardized is True:
-            logmean = self._logmoment_quad(self._one, -np.inf, **self._parameters)
-        else:
-            logmean = None
-
-        logcenter = logmean if logcenter is None else logcenter
-        res = self._logmoment_quad(order, logcenter, **self._parameters)
-        if standardized:
-            logvar = self._logmoment_quad(2, logmean, **self._parameters)
-            res = res - logvar * (order/2)
-        return res
-
-    def _logmoment_quad(self, order, logcenter, **params):
-        def logintegrand(x, order, logcenter, **params):
-            logpdf = self._logpxf_dispatch(x, **params)
-            return logpdf + order * _logexpxmexpy(np.log(x + 0j), logcenter)
-            ## if logx == logcenter, `_logexpxmexpy` returns (-inf + 0j)
-            ## multiplying by order produces (-inf + nan j) - bad
-            ## We're skipping logmoment tests, so we might don't need to fix
-            ## now, but if we ever do use run them, this might help:
-            # logx = np.log(x+0j)
-            # out = np.asarray(logpdf + order*_logexpxmexpy(logx, logcenter))
-            # i = (logx == logcenter)
-            # out[i] = logpdf[i]
-            # return out
-        return self._quadrature(logintegrand, args=(order, logcenter),
-                                params=params, log=True)
 
     ### L-Moments
 
@@ -4466,8 +4387,7 @@ def _make_distribution_custom(dist):
     return CustomDistribution
 
 
-# Rough sketch of how we might shift/scale distributions. The purpose of
-# making it a separate class is for
+# The purpose of making ShiftedScaledDistribution a separate class is for
 # a) simplicity of the ContinuousDistribution class and
 # b) avoiding the requirement that every distribution accept loc/scale.
 # The simplicity of ContinuousDistribution is important, because there are
@@ -4799,12 +4719,12 @@ class ShiftedScaledDistribution(TransformedDistribution):
         return result
 
     # Here, we override all the `_dispatch` methods rather than the public
-    # methods or _function methods. Why not the public methods?
+    # methods or _formula methods. Why not the public methods?
     # If we were to override the public methods, then other
     # TransformedDistribution classes (which could transform a
     # ShiftedScaledDistribution) would need to call the public methods of
     # ShiftedScaledDistribution, which would run the input validation again.
-    # Why not the _function methods? For distributions that rely on the
+    # Why not the _formula methods? For distributions that rely on the
     # default implementation of methods (e.g. `quadrature`, `inversion`),
     # the implementation would "see" the location and scale like other
     # distribution parameters, so they could affect the accuracy of the
@@ -4858,7 +4778,6 @@ class ShiftedScaledDistribution(TransformedDistribution):
         pxf = self._dist._pxf_dispatch(x, *args, **params)
         return pxf / np.abs(scale)
 
-    # Sorry about the magic. This is just a draft to show the behavior.
     @_shift_scale_distribution_function
     def _logcdf_dispatch(self, x, *, method=None, **params):
         pass
