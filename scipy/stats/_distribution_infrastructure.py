@@ -1224,18 +1224,9 @@ def _logexpxmexpy(x, y):
 
     Avoids over/underflow, but does not prevent loss of precision otherwise.
     """
-    # TODO: properly avoid NaN when y is negative infinity
-    # TODO: silence warning with taking log of complex nan
-    # TODO: deal with x == y better
-    i = np.isneginf(np.real(y))
-    if np.any(i):
-        y = np.asarray(y.copy())
-        y[i] = np.finfo(y.dtype).min
-    x, y = np.broadcast_arrays(x, y)
-    res = np.asarray(special.logsumexp([x, y+np.pi*1j], axis=0))
-    i = (x == y)
-    res[i] = -np.inf
-    return res
+    return xpx.apply_where(x != y, (x, y),
+                           lambda x, y: special.logsumexp([x, y+np.pi*1j], axis=0),
+                           fill_value=-np.inf)
 
 
 def _guess_bracket(xmin, xmax):
@@ -4949,12 +4940,10 @@ class OrderStatisticDistribution(TransformedDistribution):
 
     """
 
-    # These can be restricted to _IntegerInterval/_IntegerParameter in a separate
-    # PR if desired.
-    _r_domain = _RealInterval(endpoints=(1, 'n'), inclusive=(True, True))
+    _r_domain = _IntegerInterval(endpoints=(1, 'n'), inclusive=(True, True))
     _r_param = _RealParameter('r', domain=_r_domain, typical=(1, 2))
 
-    _n_domain = _RealInterval(endpoints=(1, np.inf), inclusive=(True, True))
+    _n_domain = _IntegerInterval(endpoints=(1, np.inf), inclusive=(True, True))
     _n_param = _RealParameter('n', domain=_n_domain, typical=(1, 4))
 
     _r_domain.define_parameters(_n_param)
