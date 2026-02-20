@@ -51,10 +51,12 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse import issparse
 from scipy.sparse._sputils import asmatrix, is_pydata_spmatrix, isintlike, isshape
+from scipy._lib._array_api import xp_capabilities
 
 __all__ = ["LinearOperator", "aslinearoperator"]
 
 
+@xp_capabilities(np_only=True)
 class LinearOperator:
     """Common interface for performing matrix vector products.
 
