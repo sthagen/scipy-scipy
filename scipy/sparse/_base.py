@@ -1418,7 +1418,7 @@ class _spbase(SparseABC):
         res_dtype = get_sum_dtype(self.dtype)
 
         if dtype is not None:
-            # Before casting to the requested dtype, caconicalize duplicates and zeros.
+            # Before casting to the requested dtype, canonicalize duplicates and zeros.
             if hasattr(self, 'sum_duplicates'):
                 self.sum_duplicates()
             temp = self.astype(dtype, copy=False).sum(axis=axis, dtype=None, out=out)
