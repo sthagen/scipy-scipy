@@ -36,13 +36,16 @@ def use_solver(**kwargs):
 
     Parameters
     ----------
-    useUmfpack : bool, optional
-        Use UMFPACK [1]_, [2]_, [3]_, [4]_. over SuperLU. Has effect only
-        if ``scikits.umfpack`` is installed. Default: True
-    assumeSortedIndices : bool, optional
-        Allow UMFPACK to skip the step of sorting indices for a CSR/CSC matrix.
-        Has effect only if useUmfpack is True and ``scikits.umfpack`` is
-        installed. Default: False
+    **kwargs
+        The following options may be passed as keyword arguments.
+
+        useUmfpack : bool, optional
+            Use UMFPACK [1]_, [2]_, [3]_, [4]_. over SuperLU. Has effect only
+            if ``scikits.umfpack`` is installed. Default: True
+        assumeSortedIndices : bool, optional
+            Allow UMFPACK to skip the step of sorting indices for a CSR/CSC matrix.
+            Has effect only if useUmfpack is True and ``scikits.umfpack`` is
+            installed. Default: False
 
     Notes
     -----
@@ -746,9 +749,12 @@ def spsolve_triangular(A, b, lower=True, overwrite_A=False, overwrite_b=False,
         U = A
         U.setdiag(0)
 
+    L_indices, L_indptr = safely_cast_index_arrays(L, np.intc, "SuperLU")
+    U_indices, U_indptr = safely_cast_index_arrays(U, np.intc, "SuperLU")
+
     x, info = _superlu.gstrs(trans,
-                             N, L.nnz, L.data, L.indices, L.indptr,
-                             N, U.nnz, U.data, U.indices, U.indptr,
+                             N, L.nnz, L.data, L_indices, L_indptr,
+                             N, U.nnz, U.data, U_indices, U_indptr,
                              b)
     if info:
         raise LinAlgError('A is singular.')
