@@ -684,8 +684,8 @@ const char *ber_doc = R"(
 
     See Also
     --------
-    bei : the corresponding real part
-    berp : the derivative of bei
+    bei : the corresponding imaginary part
+    berp : the derivative of ber
     jv : Bessel function of the first kind
 
     References
@@ -726,7 +726,7 @@ const char *berp_doc = R"(
 
     See Also
     --------
-    ber
+    ber : Kelvin function ber
 
     References
     ----------
@@ -1887,7 +1887,7 @@ const char *erfcx_doc = R"(
 const char *expit_doc = R"(
     expit(x, out=None)
 
-    Expit (a.k.a. logistic sigmoid) ufunc for ndarrays.
+    Expit (also known as logistic sigmoid) ufunc for ndarrays.
 
     The expit function, also known as the logistic sigmoid function, is
     defined as ``expit(x) = 1/(1+exp(-x))``.  It is the inverse of the
