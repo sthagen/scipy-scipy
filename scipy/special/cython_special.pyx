@@ -1121,8 +1121,6 @@ cdef extern from r"xsf_wrappers.h":
     double special_ber(double) nogil
     double special_berp(double) nogil
     double xsf_gdtrib(double, double, double) nogil
-    double special_gdtria(double, double, double) nogil
-    double special_gdtrix(double, double, double) nogil
     npy_double special_kei(npy_double) nogil
     npy_double special_keip(npy_double) nogil
     void special_ckelvin(npy_double, npy_cdouble *, npy_cdouble *, npy_cdouble *, npy_cdouble *) nogil
@@ -1365,8 +1363,10 @@ cdef extern from r"xsf_wrappers.h":
     double xsf_log_ndtr(double x) nogil
     npy_cdouble xsf_clog_ndtr(npy_cdouble x) nogil
     double xsf_ndtri(double x) nogil
-    double special_nrdtrimn(double p, double std, double x) nogil
-    double special_nrdtrisd(double mean, double p, double x) nogil
+    double xsf_gdtria(double p, double b, double x) nogil
+    double xsf_gdtrix(double a, double b, double p) nogil
+    double xsf_nrdtrimn(double p, double std, double x) nogil
+    double xsf_nrdtrisd(double mean, double p, double x) nogil
     double xsf_owens_t(double h, double a) nogil
     double xsf_pdtr(double k, double m) nogil
     double xsf_pdtrc(double k, double m) nogil
@@ -1709,10 +1709,6 @@ cdef _proto_ncfdtridfd_t *_proto_ncfdtridfd_t_var = &_func_ncfdtridfd
 from ._cdflib_wrappers cimport ncfdtridfn as _func_ncfdtridfn
 ctypedef double _proto_ncfdtridfn_t(double, double, double, double) noexcept nogil
 cdef _proto_ncfdtridfn_t *_proto_ncfdtridfn_t_var = &_func_ncfdtridfn
-
-from ._cdflib_wrappers cimport ncfdtrinc as _func_ncfdtrinc
-ctypedef double _proto_ncfdtrinc_t(double, double, double, double) noexcept nogil
-cdef _proto_ncfdtrinc_t *_proto_ncfdtrinc_t_var = &_func_ncfdtrinc
 
 from ._cdflib_wrappers cimport nctdtridf as _func_nctdtridf
 ctypedef double _proto_nctdtridf_t(double, double, double) noexcept nogil
@@ -2541,11 +2537,11 @@ cpdef double gdtrib(double x0, double x1, double x2) noexcept nogil:
 
 cpdef double gdtria(double x0, double x1, double x2) noexcept nogil:
     """See the documentation for scipy.special.gdtria"""
-    return special_gdtria(x0, x1, x2)
+    return xsf_gdtria(x0, x1, x2)
 
 cpdef double gdtrix(double x0, double x1, double x2) noexcept nogil:
     """See the documentation for scipy.special.gdtrix"""
-    return special_gdtrix(x0, x1, x2)
+    return xsf_gdtrix(x0, x1, x2)
 
 cpdef double complex hankel1(double x0, double complex x1) noexcept nogil:
     """See the documentation for scipy.special.hankel1"""
@@ -3128,7 +3124,7 @@ cpdef double ncfdtridfn(double x0, double x1, double x2, double x3) noexcept nog
 
 cpdef double ncfdtrinc(double x0, double x1, double x2, double x3) noexcept nogil:
     """See the documentation for scipy.special.ncfdtrinc"""
-    return _func_ncfdtrinc(x0, x1, x2, x3)
+    return (<double(*)(double, double, double, double) noexcept nogil>scipy.special._ufuncs_cxx._export_ncf_find_non_centrality_double)(x0, x1, x2, x3)
 
 cpdef df_number_t nctdtr(df_number_t x0, df_number_t x1, df_number_t x2) noexcept nogil:
     """See the documentation for scipy.special.nctdtr"""
@@ -3174,11 +3170,11 @@ cpdef double ndtri(double x0) noexcept nogil:
 
 cpdef double nrdtrimn(double x0, double x1, double x2) noexcept nogil:
     """See the documentation for scipy.special.nrdtrimn"""
-    return special_nrdtrimn(x0, x1, x2)
+    return xsf_nrdtrimn(x0, x1, x2)
 
 cpdef double nrdtrisd(double x0, double x1, double x2) noexcept nogil:
     """See the documentation for scipy.special.nrdtrisd"""
-    return special_nrdtrisd(x0, x1, x2)
+    return xsf_nrdtrisd(x0, x1, x2)
 
 cdef void obl_ang1(double x0, double x1, double x2, double x3, double *y0, double *y1) noexcept nogil:
     """See the documentation for scipy.special.obl_ang1"""

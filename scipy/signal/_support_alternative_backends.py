@@ -99,7 +99,6 @@ untested = {
     "peak_widths",
     "periodogram",
     "place_poles",
-    "sawtooth",
     "sepfir2d",
     "ss2tf",
     "ss2zpk",
@@ -269,7 +268,7 @@ capabilities_overrides = {
     "lfilter_zi": xp_capabilities(cpu_only=True, allow_dask_compute=True,
                                   jax_jit=False),
     "lfiltic": xp_capabilities(cpu_only=True, exceptions=["cupy"],
-                               allow_dask_compute=True),
+                               allow_dask_compute=True, jax_jit=False),
     "lp2bp": xp_capabilities(cpu_only=True, exceptions=["cupy", "torch"],
                              allow_dask_compute=True, jax_jit=False),
     "lp2bp_zpk": xp_capabilities(cpu_only=True, exceptions=["cupy", "torch"],
@@ -311,13 +310,6 @@ capabilities_overrides = {
                                       jax_jit=False, allow_dask_compute=True),
     "qspline2d": xp_capabilities(np_only=True, exceptions=["cupy"]),
     "remez": xp_capabilities(cpu_only=True, allow_dask_compute=True, jax_jit=False),
-    "resample": xp_capabilities(
-        cpu_only=True, exceptions=["cupy"],
-        skip_backends=[
-            ("dask.array", "XXX something in dask"),
-            ("jax.numpy", "XXX: immutable arrays"),
-        ]
-    ),
     "resample_poly": xp_capabilities(
         cpu_only=True, exceptions=["cupy"],
         jax_jit=False, skip_backends=[("dask.array", "XXX something in dask")],
