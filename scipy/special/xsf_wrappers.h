@@ -187,8 +187,6 @@ double cephes_igami(double a, double p);
 
 double cephes_igamci(double a, double p);
 
-double cephes_igam_fac(double a, double x);
-
 double cephes_lanczos_sum_expg_scaled(double x);
 
 double cephes_poch(double x, double m);
@@ -221,7 +219,8 @@ double cephes_erfcinv(double y);
 
 double cephes_round(double x);
 
-double cephes_spence(double x);
+double xsf_spence(double x);
+npy_cdouble xsf_cspence(npy_cdouble z);
 
 double xsf_struve_h(double v, double z);
 

@@ -17,11 +17,6 @@
             "ellip_harmonic_unsafe": "ddddddd->d"
         }
     },
-    "_igam_fac": {
-        "xsf_wrappers.h": {
-            "cephes_igam_fac": "dd->d"
-        }
-    },
     "_lanczos_sum_expg_scaled": {
         "xsf_wrappers.h": {
             "cephes_lanczos_sum_expg_scaled": "d->d"
@@ -642,14 +637,6 @@
         },
         "xsf_wrappers.h": {
             "cephes_smirnovp_wrap": "pd->d"
-        }
-    },
-    "spence": {
-        "_spence.pxd": {
-            "cspence": "D-> D"
-        },
-        "xsf_wrappers.h": {
-            "cephes_spence": "d->d"
         }
     },
     "stdtr": {
