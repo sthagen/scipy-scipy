@@ -5,7 +5,6 @@ _ufuncs_pxi_pxd_sources = [
   fs.copyfile('_ellip_harm.pxd'),
   fs.copyfile('_ellip_harm_2.pxd'),
   fs.copyfile('_hyp0f1.pxd'),
-  fs.copyfile('_hypergeometric.pxd'),
   fs.copyfile('_legacy.pxd'),
   fs.copyfile('orthogonal_eval.pxd'),
   fs.copyfile('sf_error.pxd'),
@@ -180,13 +179,6 @@ py3.extension_module('cython_special',
   link_with: cdflib_lib,
   install: true,
   subdir: 'scipy/special',
-)
-
-py3.extension_module('_comb',
-  cython_gen.process('_comb.pyx'),
-  link_args: version_link_args,
-  install: true,
-  subdir: 'scipy/special'
 )
 
 py3.extension_module('_test_internal',
