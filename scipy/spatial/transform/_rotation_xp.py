@@ -647,7 +647,7 @@ def apply(quat: Array, points: Array, inverse: bool = False) -> Array:
 
 
 def setitem(
-    quat: Array, value: Array, indexer: int | slice | EllipsisType | None
+    quat: Array, value: Array, indexer: int | slice | EllipsisType
 ) -> Array:
     return xpx.at(quat)[indexer, ...].set(value)
 
@@ -680,7 +680,8 @@ def align_vectors(
             "Expected inputs `a` and `b` to have shape (3,) or (N, 3), got "
             f"{a_original.shape} and {b_original.shape} respectively."
         )
-    N = a.shape[0]
+    if (N := a.shape[0]) is None:
+        raise ValueError(f"Expected `a` to have a known shape, got {a_original.shape}")
 
     # Check weights
     if weights is None:

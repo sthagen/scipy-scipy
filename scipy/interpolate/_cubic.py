@@ -5,7 +5,9 @@ from typing import Literal
 import numpy as np
 
 from scipy.linalg import solve, solve_banded
-from scipy._lib._array_api import array_namespace, xp_size, xp_capabilities
+from scipy._lib._array_api import (
+    array_namespace, xp_size, xp_capabilities, is_cupy, scipy_namespace_for
+)
 from scipy._external.array_api_compat import numpy as np_compat
 import scipy._external.array_api_extra as xpx
 
@@ -73,11 +75,12 @@ def prepare_input(x, y, axis, dydx=None, xp=None):
 
 
 @xp_capabilities(
-    cpu_only=True, jax_jit=False,
+    cpu_only=True,
+    jax_jit=False,
+    exceptions=["cupy"],
     skip_backends=[
-        ("dask.array",
-         "https://github.com/data-apis/array-api-extra/issues/488")
-    ]
+        ("dask.array", "https://github.com/data-apis/array-api-extra/issues/488")
+    ],
 )
 class CubicHermiteSpline(PPoly):
     """Piecewise cubic interpolator to fit values and first derivatives (C1 smooth).
@@ -259,9 +262,6 @@ class PchipInterpolator(CubicHermiteSpline):
 
     """
 
-    # PchipInterpolator is not generic in scipy-stubs
-    __class_getitem__ = None  # type:ignore[assignment]
-
     def __init__(self, x, y, axis=0, extrapolate=None):
         xp = array_namespace(x, y)
         x, _, y, axis, _ = prepare_input(x, y, axis, xp=xp)
@@ -412,9 +412,14 @@ def pchip_interpolate(xi, yi, x, der=0, axis=0):
         return [P.derivative(nu)(x) for nu in der]
 
 
-@xp_capabilities(cpu_only=True, jax_jit=False, xfail_backends=[
-    ("dask.array", "lacks nd fancy indexing"),
-])
+@xp_capabilities(
+    cpu_only=True,
+    jax_jit=False,
+    exceptions=["cupy"],
+    xfail_backends=[
+        ("dask.array", "lacks nd fancy indexing"),
+    ],
+)
 class Akima1DInterpolator(CubicHermiteSpline):
     r"""Akima "visually pleasing" interpolator (C1 smooth).
 
@@ -529,9 +534,6 @@ class Akima1DInterpolator(CubicHermiteSpline):
 
     """
 
-    # PchipInterpolator is not generic in scipy-stubs
-    __class_getitem__ = None  # type:ignore[assignment]
-
     def __init__(self, x, y, axis=0, *, method: Literal["akima", "makima"]="akima",
                  extrapolate:bool | None = None):
         if method not in {"akima", "makima"}:
@@ -596,7 +598,10 @@ class Akima1DInterpolator(CubicHermiteSpline):
             f12 = f1 + f2
 
             # These are the mask of where the slope at breakpoint is defined:
-            mmax = xp.max(f12) if xp_size(f12) > 0 else -xp.inf
+            size_f12 = xp_size(f12)
+            # if the size is unknown, the `max` reduction is not guaranteed to work,
+            # so use the same fallback value as the known zero size case
+            mmax = xp.max(f12) if size_f12 is not None and size_f12 > 0 else -xp.inf
             ind = f12 > break_mult * mmax
             # Set the slope at breakpoint
             t = xp.where(
@@ -629,11 +634,12 @@ class Akima1DInterpolator(CubicHermiteSpline):
 
 
 @xp_capabilities(
-    cpu_only=True, jax_jit=False,
+    cpu_only=True,
+    jax_jit=False,
+    exceptions=["cupy"],
     skip_backends=[
-        ("dask.array",
-         "https://github.com/data-apis/array-api-extra/issues/488")
-    ]
+        ("dask.array", "https://github.com/data-apis/array-api-extra/issues/488")
+    ],
 )
 class CubicSpline(CubicHermiteSpline):
     """Piecewise cubic interpolator to fit values (C2 smooth).
@@ -805,6 +811,16 @@ class CubicSpline(CubicHermiteSpline):
 
     def __init__(self, x, y, axis=0, bc_type='not-a-knot', extrapolate=None):
         xp = array_namespace(x, y)
+        if is_cupy(xp):
+            spx = scipy_namespace_for(xp)
+            xp_cubic_spline = spx.interpolate.CubicSpline(
+                x, y, axis=axis, bc_type=bc_type, extrapolate=extrapolate
+            )
+            self.__dict__.update(
+                PPoly._construct_from_xp(xp_cubic_spline, xp_external=xp).__dict__
+            )
+            return
+
         x, dx, y, axis, _ = prepare_input(x, y, axis, xp=np_compat)
         n = len(x)
 

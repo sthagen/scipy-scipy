@@ -228,7 +228,7 @@ solve-group = "mkl-ilp64"
 
 [environments.py312-system-libs-osx]
 # tasks: build-system-libs, test-system-libs
-features = ["build-deps", "run-deps", "test-deps", "py312", "scikit-sparse", "system-libs", "default-platforms"]
+features = ["build-deps", "run-deps", "test-deps", "py312", "scikit-sparse", "system-libs", "osx-platform"]
 
 [environments.scipy-openblas32]
 # tasks: build-scipy-openblas32, test-scipy-openblas32
@@ -252,7 +252,10 @@ no-default-feature = true
 
 [feature.default-platforms]
 # this feature can be included in any environment to exclude all other platforms
-platforms = ["linux-64", "osx-arm64", "win-64"]
+platforms = ["linux-64", "osx-arm64", "win-64", "linux-aarch64"]
+
+[feature.osx-platform]
+platforms = ["osx-arm64"]
 
 
 ### Default dependencies (included in all environments by default) ###
@@ -382,6 +385,8 @@ dask = "*"
 matplotlib = "*"
 pybind11 = "*"
 sphinx = "*"
+sympy = "*"
+uarray = "*"
 
 [feature.typecheck.tasks.mypy]
 cmd = "spin mypy --no-build"
@@ -750,7 +755,7 @@ jaxlib = { version = "*", build = "*cpu*" }
 
 [feature.jax-cpu-tasks]
 # Windows support pending: https://github.com/conda-forge/jaxlib-feedstock/issues/161
-platforms = ["linux-64", "osx-arm64"]
+platforms = ["linux-64", "osx-arm64", "linux-aarch64"]
 
 [feature.jax-cpu-tasks.tasks.test-jax]
 cmd = "spin test --no-build --build-dir=build-cpu -b jax.numpy -m 'array_api_backends and not slow'"
