@@ -87,7 +87,6 @@ def from_matrix(matrix: Array, assume_valid: bool = False) -> Array:
 def _from_matrix_orthogonal(matrix: Array) -> Array:
     """Convert known orthogonal rotation matrix to quaternion"""
     xp = array_namespace(matrix)
-    device = xp_device(matrix)
 
     matrix_trace = matrix[..., 0, 0] + matrix[..., 1, 1] + matrix[..., 2, 2]
     decision = xp.stack(
@@ -95,7 +94,6 @@ def _from_matrix_orthogonal(matrix: Array) -> Array:
         axis=-1,
     )
     choice = xp.argmax(decision, axis=-1, keepdims=True)
-    quat = xp.empty((*matrix.shape[:-2], 4), dtype=matrix.dtype, device=device)
 
     # The Array API does not support mixing integer indexing with ellipsis, so we cannot
     # follow the same pattern as the cython backend. Instead, we compute each case
@@ -113,8 +111,6 @@ def _from_matrix_orthogonal(matrix: Array) -> Array:
         ],
         axis=-1,
     )
-    quat = xp.where(choice == 0, quat_0, quat)
-
     # Case 1
     quat_1 = xp.stack(
         [
@@ -125,8 +121,6 @@ def _from_matrix_orthogonal(matrix: Array) -> Array:
         ],
         axis=-1,
     )
-    quat = xp.where(choice == 1, quat_1, quat)
-
     # Case 2
     quat_2 = xp.stack(
         [
@@ -137,8 +131,6 @@ def _from_matrix_orthogonal(matrix: Array) -> Array:
         ],
         axis=-1,
     )
-    quat = xp.where(choice == 2, quat_2, quat)
-
     # Case 3
     quat_3 = xp.stack(
         [
@@ -149,9 +141,11 @@ def _from_matrix_orthogonal(matrix: Array) -> Array:
         ],
         axis=-1,
     )
-    quat = xp.where(choice == 3, quat_3, quat)
-
-    return _normalize_quaternion(quat)
+    # Override locations where quat_0 is not our choice
+    quat_0 = xp.where(choice == 1, quat_1, quat_0)
+    quat_0 = xp.where(choice == 2, quat_2, quat_0)
+    quat_0 = xp.where(choice == 3, quat_3, quat_0)
+    return _normalize_quaternion(quat_0)
 
 
 def from_rotvec(rotvec: Array, degrees: bool = False) -> Array:
@@ -613,7 +607,9 @@ def reduce(
     right_best = max_ind % rv.shape[0]
     # Array API limitation: Integer index arrays are only allowed with integer indices
     # TODO: Can we somehow avoid this?
-    all_idx = xp.reshape(xp.arange(left.shape[-1]), (1, -1))
+    all_idx = xp.reshape(
+        xp.arange(left.shape[-1], device=xp_device(left)), (1, -1)
+    )
     left_idx = xp.reshape(left_best, (-1, 1))
     left = left[left_idx, all_idx]
     right_idx = xp.reshape(right_best, (-1, 1))
@@ -703,7 +699,9 @@ def align_vectors(
 
     # For the special case of a single vector pair, we use the infinite
     # weight code path
-    weight_is_inf = xp.asarray([True]) if N == 1 else weights == xp.inf
+    weight_is_inf = (
+        xp.asarray([True], device=xp_device(a)) if N == 1 else weights == xp.inf
+    )
     n_inf = xp.sum(xp.astype(weight_is_inf, a.dtype))
     # We can only error out on multiple infinite weights or sensitivity return with
     # infinite weights in eager execution models. Lazy backends will return NaNs.
